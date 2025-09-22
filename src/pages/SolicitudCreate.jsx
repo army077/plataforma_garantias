@@ -1,8 +1,9 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { createSolicitud, listUsuarios, listClientes, listTickets } from "../lib/api.js";
-import { useNavigate } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
+import { createSolicitud } from "../lib/api.js";
+import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../auth/AuthProvider.jsx";
+import axios from "axios";
 
 // Responsable por defecto para solicitantes
 const RESPONSABLE_DEFAULT = {
@@ -13,80 +14,114 @@ const RESPONSABLE_DEFAULT = {
 
 export default function SolicitudCreate() {
   const navigate = useNavigate();
+  const { zohoId } = useParams();
   const { user, role, usuarioId } = useAuth();
   const esSolicitante = role === "solicitante";
   const esGarantias = role === "garantias" || role === "admin";
 
-  // Agente/admin pueden cambiar el responsable; solicitante NO
   const [cambiarUsuario, setCambiarUsuario] = useState(false);
 
+  // NUEVO shape del formulario: adiós ticket_id/cliente_id
   const [form, setForm] = useState({
     email: "",
     usuario_id: null,
     prioridad_id: 1,
-    ticket_id: null,
-    cliente_id: null,
     tipo_garantia_id: 1,
     gestion_garantia_id: 1,
     observaciones: "",
+
+    // nuevos campos
+    ticket_numero: "",
+    cliente_nombre: "",
+    ticket_id_externo: "", // el Zoho ID
   });
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // Prefill: email siempre es el del que inicia sesión.
-  // usuario_id:
-  //  - solicitante => Nohemí (id 3)
-  //  - agente/admin => su propio usuarioId (editable si activan "Cambiar usuario")
+  // Etiquetas de solo lectura
+  const [clienteLabel, setClienteLabel] = useState("");
+  const [ticketLabel, setTicketLabel] = useState("");
+
+  // Prefill responsable y email
   useEffect(() => {
     if (user?.email) set("email", user.email);
     if (esSolicitante) {
-      console.log("Insertar id de la persona de garantias: " + RESPONSABLE_DEFAULT.id);
       set("usuario_id", RESPONSABLE_DEFAULT.id);
       setCambiarUsuario(false);
     } else if (usuarioId) {
-      console.log("Insertar id del login: " + usuarioId);
       set("usuario_id", usuarioId);
     }
   }, [user?.email, usuarioId, esSolicitante]);
 
-  // búsquedas
-  const [qUsuario, setQUsuario] = useState("");
-  const [qCliente, setQCliente] = useState("");
-  const [qTicket, setQTicket] = useState("");
-
-  // Solo cargo usuarios si un agente/admin activó el toggle
-  const { data: usuarios = [], refetch: refetchUsuarios, isFetching: fU } = useQuery({
-    queryKey: ["usuarios", qUsuario, cambiarUsuario],
-    queryFn: () => listUsuarios(qUsuario, 0, 20),
-    enabled: esGarantias && cambiarUsuario,
-  });
-
-  const { data: clientes = [], refetch: refetchClientes, isFetching: fC } = useQuery({
-    queryKey: ["clientes", qCliente],
-    queryFn: () => listClientes(qCliente, 0, 20),
-  });
-
-  const { data: tickets = [], refetch: refetchTickets, isFetching: fT } = useQuery({
-    queryKey: ["tickets", qTicket],
-    queryFn: () => listTickets(qTicket, 0, 20),
-  });
-
-  // Si agente/admin cambia usuario y elige uno, autollenar email solo si el campo está vacío.
+  // Autoprefill por Zoho ID
   useEffect(() => {
-    if (!(esGarantias && cambiarUsuario)) return;
-    const u = usuarios.find(x => x.id === form.usuario_id);
-    if (u && !form.email) set("email", u.email);
-  }, [form.usuario_id, usuarios, esGarantias, cambiarUsuario]);
+    if (!zohoId) return;
+    (async () => {
+      try {
+        const { data: z } = await axios.get(
+          `https://desarrollotecnologicoar.com/api8/ticket/${zohoId}`
+        );
+
+        const razon = z?.accountDetails?.accountName || "";
+        const numeroZoho = z?.ticketNumber || "";
+
+        setClienteLabel(razon || "—");
+        setTicketLabel(numeroZoho || String(zohoId));
+
+        // escribir en el form lo que vamos a ENVIAR
+        set("cliente_nombre", razon || "");
+        set("ticket_numero", numeroZoho || "");
+        set("ticket_id_externo", String(zohoId));
+      } catch (e) {
+        console.error("No pude precargar por Zoho ID:", e);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zohoId]);
+
+  // Si un agente/admin cambia el responsable manualmente,
+  // podrías cargar lista de usuarios aquí si quisieras.
+  // Para no distraernos, lo dejamos simple:
+  const puedeCambiarUsuario = esGarantias && cambiarUsuario;
 
   const { mutate, isPending } = useMutation({
     mutationFn: createSolicitud,
-    onSuccess: (data) => navigate(esSolicitante ? `/s/${data.id}/solicitante` : `/s/${data.id}`),
+    onSuccess: (data) =>
+      navigate(esSolicitante ? `/s/${data.id}/solicitante` : `/s/${data.id}`),
     onError: (e) => alert(e?.response?.data?.error || e.message),
   });
 
-  const canSubmit = useMemo(() =>
-    Boolean(form.usuario_id && form.ticket_id && form.cliente_id && form.email),
-  [form]);
+  // Nueva validación: ya no pedimos ticket_id/cliente_id
+  const canSubmit = useMemo(
+    () =>
+      Boolean(
+        form.usuario_id &&
+          form.email &&
+          form.ticket_numero &&
+          form.cliente_nombre &&
+          form.ticket_id_externo
+      ),
+    [form]
+  );
+
+  const handleCrear = () => {
+    // payload con los nuevos nombres
+    const payload = {
+      email: form.email,
+      usuario_id: form.usuario_id,
+      prioridad_id: form.prioridad_id,
+      tipo_garantia_id: form.tipo_garantia_id,
+      gestion_garantia_id: form.gestion_garantia_id,
+      observaciones: form.observaciones,
+
+      // Lo importante:
+      ticket_numero: form.ticket_numero,
+      cliente_nombre: form.cliente_nombre,
+      ticket_id_externo: form.ticket_id_externo,
+    };
+
+    mutate(payload);
+  };
 
   return (
     <div className="card space-y-4">
@@ -101,14 +136,16 @@ export default function SolicitudCreate() {
       <section className="grid md:grid-cols-2 gap-3">
         <div className="p-3 rounded-xl border border-neutral-800 bg-neutral-950/40">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-medium text-neutral-300">Usuario interno (responsable)</div>
+            <div className="text-sm font-medium text-neutral-300">
+              Usuario interno (responsable)
+            </div>
             {esGarantias && (
               <label className="text-xs flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   className="accent-blue-600"
                   checked={cambiarUsuario}
-                  onChange={(e)=>setCambiarUsuario(e.target.checked)}
+                  onChange={(e) => setCambiarUsuario(e.target.checked)}
                 />
                 Cambiar usuario
               </label>
@@ -124,51 +161,33 @@ export default function SolicitudCreate() {
             />
           )}
 
-          {/* Agente/Admin: por defecto ellos mismos; pueden cambiar si activan toggle */}
-          {!esSolicitante && !cambiarUsuario && (
+          {/* Agente/Admin sin cambio */}
+          {!esSolicitante && !puedeCambiarUsuario && (
             <input
               className="input"
-              value={`${user?.name || user?.displayName || ""} • ${user?.email || ""}`}
+              value={`${user?.name || user?.displayName || ""} • ${
+                user?.email || ""
+              }`}
               disabled
             />
           )}
 
-          {esGarantias && cambiarUsuario && (
-            <>
-              <div className="flex gap-2">
-                <input
-                  className="input"
-                  placeholder="Buscar usuario (nombre o email)"
-                  value={qUsuario}
-                  onChange={(e)=>setQUsuario(e.target.value)}
-                />
-                <button className="btn" onClick={()=>refetchUsuarios()} disabled={fU}>
-                  {fU ? "..." : "Buscar"}
-                </button>
-              </div>
-              <select
-                className="input mt-2"
-                value={form.usuario_id || ""}
-                onChange={(e)=>set("usuario_id", Number(e.target.value) || null)}
-              >
-                <option value="">Selecciona usuario…</option>
-                {usuarios.map(u => (
-                  <option key={u.id} value={u.id}>{u.nombre} • {u.email}</option>
-                ))}
-              </select>
-              {form.usuario_id && (
-                <div className="mt-1 text-xs text-neutral-400">Seleccionado ID: {form.usuario_id}</div>
-              )}
-            </>
+          {/* Si quisieras permitir elegir responsable, aquí iría el select de usuarios */}
+          {puedeCambiarUsuario && (
+            <div className="text-xs text-neutral-500">
+              Aquí pondrías tu selector de usuarios, si decides activarlo.
+            </div>
           )}
         </div>
 
         <div className="p-3 rounded-xl border border-neutral-800 bg-neutral-950/40">
-          <div className="mb-2 text-sm font-medium text-neutral-300">Correo del solicitante (contacto)</div>
+          <div className="mb-2 text-sm font-medium text-neutral-300">
+            Correo del solicitante (contacto)
+          </div>
           <input
             className="input"
             value={form.email}
-            onChange={(e)=>set("email", e.target.value)}
+            onChange={(e) => set("email", e.target.value)}
             disabled={esSolicitante && !cambiarUsuario}
           />
           {esSolicitante && !cambiarUsuario && (
@@ -179,60 +198,35 @@ export default function SolicitudCreate() {
         </div>
       </section>
 
-      {/* Cliente / Ticket */}
-      <section className="grid md:grid-cols-2 gap-3">
-        <div className="p-3 rounded-xl border border-neutral-800 bg-neutral-950/40">
-          <div className="mb-2 text-sm font-medium text-neutral-300">Cliente</div>
-          <div className="flex gap-2">
-            <input
-              className="input"
-              placeholder="Buscar cliente (razón social)"
-              value={qCliente}
-              onChange={(e)=>setQCliente(e.target.value)}
-            />
-            <button className="btn" onClick={()=>refetchClientes()} disabled={fC}>
-              {fC ? "..." : "Buscar"}
-            </button>
+      {/* Solo lectura para confirmar que jaló bien */}
+      <div className="rounded-xl border border-amber-600/40 bg-amber-500/10 p-3 mb-2">
+        <div className="grid sm:grid-cols-3 gap-2 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded bg-amber-600/20 text-amber-300 uppercase text-[10px] tracking-wide">
+              Cliente
+            </span>
+            <span className="font-medium text-neutral-200">
+              {clienteLabel || "—"}
+            </span>
           </div>
-          <select
-            className="input mt-2"
-            value={form.cliente_id || ""}
-            onChange={(e)=>set("cliente_id", Number(e.target.value) || null)}
-          >
-            <option value="">Selecciona cliente…</option>
-            {clientes.map(c => (
-              <option key={c.id} value={c.id}>{c.razon_social}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="p-3 rounded-xl border border-neutral-800 bg-neutral-950/40">
-          <div className="mb-2 text-sm font-medium text-neutral-300">Ticket</div>
-          <div className="flex gap-2">
-            <input
-              className="input"
-              placeholder="Buscar ticket (número o id_externo)"
-              value={qTicket}
-              onChange={(e)=>setQTicket(e.target.value)}
-            />
-            <button className="btn" onClick={()=>refetchTickets()} disabled={fT}>
-              {fT ? "..." : "Buscar"}
-            </button>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded bg-amber-600/20 text-amber-300 uppercase text-[10px] tracking-wide">
+              Ticket
+            </span>
+            <span className="font-medium text-neutral-200">
+              {ticketLabel || "—"}
+            </span>
           </div>
-          <select
-            className="input mt-2"
-            value={form.ticket_id || ""}
-            onChange={(e)=>set("ticket_id", Number(e.target.value) || null)}
-          >
-            <option value="">Selecciona ticket…</option>
-            {tickets.map(t => (
-              <option key={t.id} value={t.id}>
-                #{t.id} • {t.numero}{t.id_externo ? ` • ${t.id_externo}` : ""}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded bg-amber-600/20 text-amber-300 uppercase text-[10px] tracking-wide">
+              Zoho ID
+            </span>
+            <span className="font-medium text-neutral-200">
+              {zohoId || "—"}
+            </span>
+          </div>
         </div>
-      </section>
+      </div>
 
       {/* Parámetros de garantía */}
       <section className="grid md:grid-cols-2 gap-3">
@@ -241,7 +235,7 @@ export default function SolicitudCreate() {
           <select
             className="input"
             value={form.prioridad_id}
-            onChange={(e)=>set("prioridad_id", Number(e.target.value))}
+            onChange={(e) => set("prioridad_id", Number(e.target.value))}
           >
             <option value={1}>Alta - Urgente/Escalación</option>
             <option value={2}>Medio - Importante</option>
@@ -255,7 +249,7 @@ export default function SolicitudCreate() {
             <select
               className="input"
               value={form.tipo_garantia_id}
-              onChange={(e)=>set("tipo_garantia_id", Number(e.target.value))}
+              onChange={(e) => set("tipo_garantia_id", Number(e.target.value))}
             >
               <option value={1}>Local</option>
               <option value={2}>Foránea</option>
@@ -268,7 +262,7 @@ export default function SolicitudCreate() {
             <select
               className="input"
               value={form.gestion_garantia_id}
-              onChange={(e)=>set("gestion_garantia_id", Number(e.target.value))}
+              onChange={(e) => set("gestion_garantia_id", Number(e.target.value))}
             >
               <option value={1}>Visita técnica presencial</option>
               <option value={2}>Liberación y envío de refacción</option>
@@ -287,19 +281,19 @@ export default function SolicitudCreate() {
           className="input h-28"
           placeholder="Describe brevemente el caso"
           value={form.observaciones}
-          onChange={(e)=>set("observaciones", e.target.value)}
+          onChange={(e) => set("observaciones", e.target.value)}
         />
       </section>
 
       {/* Footer acciones */}
       <div className="sticky bottom-0 pt-2 bg-gradient-to-t from-black/60">
         <div className="flex gap-2 justify-end">
-          <button className="btn" onClick={()=>history.back()}>Cancelar</button>
+          <button className="btn" onClick={() => history.back()}>Cancelar</button>
           <button
             className={`btn btn-primary ${!canSubmit ? "opacity-60 cursor-not-allowed" : ""}`}
             disabled={isPending || !canSubmit}
-            onClick={()=>mutate(form)}
-            title={!canSubmit ? "Completa usuario, cliente y ticket" : "Crear"}
+            onClick={handleCrear}
+            title={!canSubmit ? "Completa usuario, email, ticket y cliente" : "Crear"}
           >
             {isPending ? "Creando…" : "Crear"}
           </button>
