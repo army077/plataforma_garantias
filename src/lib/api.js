@@ -39,6 +39,13 @@ export const createSolicitud = async (payload) => (await api.post("/solicitudes"
 export const cambiarEstadoSolicitud = async (id, a, nota = "", actor_id = 1) =>
   (await api.post(`/solicitudes/${id}/estado`, { a, nota, actor_id })).data;
 
+export const setClasificacionGarantia = async (id, payload) =>
+  (await api.put(`/solicitudes/${id}`, payload)).data;
+// payload: { clasificacion_garantia, folio_sai }
+// Actualiza la clasificación por ITEM dentro de la solicitud
+export const setClasificacionItem = async (solicitudId, itemId, motivo) =>
+  (await api.put(`/solicitudes/motivo_item/${solicitudId}/items/${itemId}`, { motivo })).data;
+
 // Cambiar estado de un ITEM
 export const cambiarEstadoItem = async (itemId, payload /* {actor_id, a, nota} */) => {
   const { data } = await api.post(`/solicitudes/items/${itemId}/estado`, payload);
@@ -51,3 +58,17 @@ export const addItem = async (solId, payload) =>
 // Catálogo
 export const buscarProductos = async (q, start = 0, end = 10) =>
   (await api.get("/catalogo/productos", { params: { q, _start: start, _end: end } })).data;
+
+//FUERA DE LA API12
+// POST: agregar comentario (HTML) a ticket de Zoho vía tu backend
+export const addZohoComment = async ({ ticketId, message, isPublic = true }) => {
+  const url = `https://desarrollotecnologicoar.com/api8/ticket/${ticketId}/comment`;
+
+  const { data } = await axios.post(url, { message, isPublic }, {
+    headers: {
+      "Content-Type": "application/json"
+    }
+  });
+
+  return data;
+};

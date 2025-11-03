@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { listSolicitudes } from "../lib/api.js";
 import { Link } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import EstadoBadge from "../components/EstadoBadge.jsx";
 import Loader from "../components/Loader.jsx";
 import { useAuth } from "../auth/AuthProvider.jsx";
@@ -12,7 +12,6 @@ export default function SolicitudesList() {
   const { role, user, loading } = useAuth();
   const esGarantias = ROLES_GARANTIAS.includes(role);
 
-  // qInput = lo que escribe el usuario; q = lo que realmente buscamos
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
 
@@ -23,20 +22,18 @@ export default function SolicitudesList() {
     email: esGarantias ? "all" : (user?.email || ""),
   }), [q, esGarantias, user?.email]);
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["solicitudes", params],      // solo cambia cuando cambia q (no qInput)
+  const { data, isLoading } = useQuery({
+    queryKey: ["solicitudes", params],
     queryFn: () => listSolicitudes(params),
     enabled: !loading && (esGarantias || !!user?.email),
   });
 
-  // Buscar al dar click o Enter
   const runSearch = () => setQ(qInput);
   const keyHandler = (e) => { if (e.key === "Enter") runSearch(); };
 
   if (loading || isLoading) return <Loader />;
 
   const rows = data?.rows || [];
-
   const buildLink = (id) => (esGarantias ? `/s/${id}` : `/s/${id}/solicitante`);
 
   return (
@@ -66,9 +63,11 @@ export default function SolicitudesList() {
             <div className="flex items-start justify-between">
               <div>
                 <div className="font-semibold">
-                  Solicitud #{s.id} • Ticket {s.ticket_numero || "N/A"}
+                  Solicitud #{s.id} • Ticket {s.ticket_numero || s.cliente_label || "N/A"}
                 </div>
-                <div className="text-sm text-neutral-400">{s.razon_social || "Sin cliente"}</div>
+                <div className="text-sm text-neutral-400">
+                  {s.cliente_nombre || s.razon_social || "Sin cliente"}
+                </div>
                 <div className="text-xs text-neutral-500">
                   {new Date(s.creado_en).toLocaleString()}
                 </div>

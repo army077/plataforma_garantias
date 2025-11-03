@@ -1,10 +1,13 @@
 // src/pages/SolicitudShow.jsx
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   addItem,
   buscarProductos,
   cambiarEstadoSolicitud,
   getSolicitud,
+  setClasificacionGarantia,
+  setClasificacionItem,
+  addZohoComment
 } from "../lib/api.js";
 import { useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
@@ -33,6 +36,23 @@ const MONEDA_LABEL = {
   "4": "EURO",
   "5": "LIBRA ESTERLINA",
 };
+
+// opciones del combo
+const CLASIF_OPTIONS = [
+  "Instalación",
+  "Garantía de Equipo",
+  "Garantía de Componente/ Servicio",
+  "Cortesía",
+];
+
+const MEDIO_ENTREGA_OPTIONS = [
+  "Entrega en sucursal",
+  "Envío por Uber",
+  "Paquetería a domicilio del cliente",
+  "Paquetería ocurre o central",
+  "Envío por grúa interna",
+];
+
 
 /* ----------------------- Placeholder de imagen ----------------------- */
 const PLACEHOLDER =
@@ -138,6 +158,82 @@ const MACHINE_LABEL = {
   SAAP: "SAAP",
 };
 
+const ITEM_CLASIF_OPTS = [
+  "Pieza sin Seguimiento",
+  "Utilizada y con técnico",
+  "No utilizada y con técnico",
+  "En almacén AR",
+  "Con el Cliente",
+  "Utilizada y con Garantías",
+  "Utilizada y en CDMX",
+  "Utilizada y en MTY",
+  "Utilizada y en Ocotlán",
+];
+
+// HTML para comentar en Zoho cuando se entrega
+function buildEntregaHTML(solicitud) {
+  const fmt = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
+  const itemsRows = (solicitud.items || [])
+    .map(it => `
+      <tr>
+        <td>${it.numero_parte || ""}</td>
+        <td>${(it.descripcion || "").replace(/</g, "&lt;")}</td>
+        <td class="num">${it.cantidad ?? ""} ${it.unidad ?? ""}</td>
+        <td class="num">${fmt.format(Number(it.precio_total ?? 0))}</td>
+      </tr>
+    `)
+    .join("");
+
+  return `
+  <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; color:#0f172a;">
+    <div style="padding:16px; border-radius:12px; background:#f3f4f6; border:1px solid #d1d5db;">
+      <h2 style="margin:0 0 6px; font-size:18px;">Orden de Trabajo entregada ✅</h2>
+      <div style="font-size:12px; color:#475569; margin-bottom:10px;">Estatus: <strong>PIEZAS ENTREGADAS</strong>.</div>
+
+      <table style="width:100%; border-collapse:separate; border-spacing:0 8px; font-size:13px;">
+        <tr>
+          <td style="width:180px; color:#64748b;">Agente:</td>
+          <td style="font-weight:600;">Nohemi Amaya</td>
+        </tr>
+        <tr>
+          <td style="color:#64748b;">Clasificación de Garantía:</td>
+          <td>${solicitud.clasificacion_garantia || "-"}</td>
+        </tr>
+        <tr>
+          <td style="color:#64748b;">Medio de Entrega:</td>
+          <td>${solicitud.medio_entrega || "-"}</td>
+        </tr>
+      </table>
+
+      <div style="margin-top:14px; font-weight:600;">Piezas relacionadas</div>
+      <table style="width:100%; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; font-size:13px;">
+        <thead>
+          <tr style="background:#ef4444; color:white;">
+            <th style="text-align:left; padding:8px 10px; width:120px;">Número</th>
+            <th style="text-align:left; padding:8px 10px;">Descripción</th>
+            <th style="text-align:right; padding:8px 10px; width:140px;">Cantidad</th>
+            <th style="text-align:right; padding:8px 10px; width:140px;">Precio total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsRows || `<tr><td colspan="4" style="padding:10px; color:#64748b;">Sin items.</td></tr>`}
+        </tbody>
+      </table>
+
+      <style>
+        td.num, th.num { text-align:right; }
+        tbody tr:nth-child(odd) td { background:#f9fafb; }
+        tbody td { padding:8px 10px; }
+      </style>
+
+      <div style="margin-top:12px; font-size:12px; color:#64748b;">
+        Generado automáticamente por la plataforma de garantías.
+      </div>
+    </div>
+  </div>`;
+}
+
+
 export default function SolicitudShow() {
   const { id } = useParams();
 
@@ -145,6 +241,8 @@ export default function SolicitudShow() {
     queryKey: ["solicitud", id],
     queryFn: () => getSolicitud(id),
   });
+
+  const queryClient = useQueryClient();
 
   const [nota, setNota] = useState("");
 
@@ -187,7 +285,32 @@ export default function SolicitudShow() {
     onError: (e) => alert(e?.response?.data?.error || e.message),
   });
 
-  if (isLoading) return <Loader />;
+  const mutClasifItem = useMutation({
+    mutationFn: ({ itemId, value }) => setClasificacionItem(id, itemId, value),
+    // Optimistic update opcional
+    onMutate: async ({ itemId, value }) => {
+      await queryClient.cancelQueries({ queryKey: ["solicitud", id] });
+      const prev = queryClient.getQueryData(["solicitud", id]);
+      queryClient.setQueryData(["solicitud", id], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          items: old.items?.map((it) =>
+            it.id === itemId ? { ...it, motivo: value } : it
+          ),
+        };
+      });
+      return { prev };
+    },
+    onError: (_e, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["solicitud", id], ctx.prev);
+      alert("No se pudo guardar la clasificación del item.");
+    },
+    onSettled: () => {
+      // Si quieres asegurar consistencia
+      queryClient.invalidateQueries({ queryKey: ["solicitud", id] });
+    },
+  });
 
   const acc = transiciones[s?.estado_code] || [];
 
@@ -202,6 +325,16 @@ export default function SolicitudShow() {
   const unitCur = selected?.moneda_precio ?? "1";
   const unitPriceMXN = toMXN(unitPrice, unitCur);
   const totalPreviewMXN = selected && qtyValid ? qtyNum * unitPriceMXN : 0;
+
+  // Modal clasificación para aprobar
+  const [clasifOpen, setClasifOpen] = useState(false);
+  const [clasifValue, setClasifValue] = useState("");
+  const [savingClasif, setSavingClasif] = useState(false);
+
+  const [folioSaiValue, setFolioSaiValue] = useState("");
+  const [medioEntregaValue, setMedioEntregaValue] = useState("");
+
+  if (isLoading) return <Loader />;
 
   const openDrawer = (p) => {
     setSelected({ ...p, link_img: p.link_img || PLACEHOLDER });
@@ -293,7 +426,30 @@ export default function SolicitudShow() {
             <button
               key={a}
               className="btn btn-primary"
-              onClick={() => mutCambiar.mutate({ a, nota })}
+              onClick={async () => {
+                // 👇 Caso especial: APROBADA desde EN_REVISION
+                if (a === "APROBADA" && s?.estado_code === "EN_REVISION") {
+                  setClasifOpen(true); // abre modal de clasificación
+                  return;
+                }
+
+                // 👇 Caso especial: ENTREGADA → agrega comentario en Zoho
+                if (a === "ENTREGADA") {
+                  const ticketId = s?.ticket_id_externo; // ajusta al campo real en tu DB
+                  if (ticketId) {
+                    const html = buildEntregaHTML(s); // tu función para armar el HTML bonito
+                    try {
+                      await addZohoComment({ ticketId, message: html, isPublic: true });
+                      console.log("✅ Comentario agregado en Zoho");
+                    } catch (err) {
+                      console.error("❌ Error al enviar comentario a Zoho:", err);
+                    }
+                  }
+                }
+
+                // 👇 Resto de transiciones normales
+                mutCambiar.mutate({ a, nota });
+              }}
             >
               {a.replaceAll("_", " ")}
             </button>
@@ -312,21 +468,35 @@ export default function SolicitudShow() {
         <div className="font-semibold mb-2">Items</div>
         {s.items?.length ? (
           s.items.map((it) => (
-            <div
-              key={it.id}
-              className="flex justify-between py-2 border-b border-neutral-800 last:border-0"
-            >
-              <div>
-                <div className="font-medium">
-                  {it.numero_parte} • {it.descripcion}
+            <div key={it.id} className="py-3 border-b border-neutral-200 last:border-0">
+              <div className="flex justify-between gap-3">
+                <div>
+                  <div className="font-medium">{it.numero_parte} • {it.descripcion}</div>
+                  <div className="text-sm text-neutral-500">
+                    Cant: {it.cantidad} {it.unidad} • ${it.precio_unitario || 0} • Estado: {it.estado_pieza_code}
+                  </div>
                 </div>
-                <div className="text-sm text-neutral-400">
-                  Cant: {it.cantidad} {it.unidad} • ${it.precio_unitario || 0} •
-                  Estado: {it.estado_pieza_code}
+
+                {/* Select de clasificación por item */}
+                <div className="w-64 shrink-0">
+                  <label className="block text-xs text-neutral-500 mb-1">Acciones / Clasificación</label>
+                  <select
+                    className="input"
+                    value={it.motivo || ""}
+                    onChange={(e) =>
+                      mutClasifItem.mutate({ itemId: it.id, value: e.target.value })
+                    }
+                    disabled={mutClasifItem.isLoading && mutClasifItem.variables?.itemId === it.id}
+                  >
+                    <option value="">Elige una opción</option>
+                    {ITEM_CLASIF_OPTS.map((op) => (
+                      <option key={op} value={op}>{op}</option>
+                    ))}
+                  </select>
+                  {mutClasifItem.isLoading && mutClasifItem.variables?.itemId === it.id && (
+                    <div className="mt-1 text-xs text-blue-600">Guardando…</div>
+                  )}
                 </div>
-              </div>
-              <div className="text-xs text-neutral-500">
-                {it.folio_sai_liberacion || ""}
               </div>
             </div>
           ))
@@ -417,24 +587,158 @@ export default function SolicitudShow() {
 
       {/* Bitácora */}
       <div className="card">
-        <div className="font-semibold mb-2">Bitácora</div>
+        <div className="font-semibold mb-2 text-neutral-800">Bitácora</div>
         {s.bitacora?.length ? (
           s.bitacora.map((b) => (
             <div
               key={b.id}
-              className="text-sm text-neutral-300 py-1 border-b border-neutral-800 last:border-0"
+              className="text-sm text-neutral-700 py-2 border-b border-neutral-200 last:border-0"
             >
-              {new Date(b.ts).toLocaleString()} • {b.accion}{" "}
-              {b.de ? `(${b.de}→${b.a})` : ""} {b.nota ? `• ${b.nota}` : ""}{" "}
-              <span className="text-neutral-500">
-                {b.actor ? `• ${b.actor}` : ""}
-              </span>
+              <span className="font-medium text-neutral-800">
+                {new Date(b.ts).toLocaleString()}
+              </span>{" "}
+              • {b.accion}{" "}
+              {b.de ? (
+                <span className="text-blue-700 font-medium">
+                  ({b.de} → {b.a})
+                </span>
+              ) : null}{" "}
+              {b.nota ? `• ${b.nota}` : ""}{" "}
+              {b.actor && (
+                <span className="text-neutral-500">• {b.actor}</span>
+              )}
             </div>
           ))
         ) : (
           <div className="text-sm text-neutral-500">Sin movimientos.</div>
         )}
       </div>
+
+      {/* Modal: Clasificación antes de aprobar */}
+      {/* Modal: Clasificación antes de aprobar */}
+      {clasifOpen && (
+        <>
+          {/* Backdrop con leve blur */}
+          <div
+            className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-[1px]"
+            onClick={() => !savingClasif && setClasifOpen(false)}
+          />
+
+          {/* Panel */}
+          <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="w-full sm:max-w-lg bg-white rounded-2xl shadow-2xl border border-neutral-200 overflow-hidden">
+              {/* Header */}
+              <div className="px-5 py-4 bg-neutral-50 border-b border-neutral-200 flex items-start justify-between">
+                <div>
+                  <div className="text-lg font-semibold text-neutral-900">Confirmación</div>
+                  <div className="text-sm text-neutral-600">Tip: recuerda verificar la gestión.</div>
+                </div>
+                <button
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-100"
+                  onClick={() => !savingClasif && setClasifOpen(false)}
+                  aria-label="Cerrar"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="px-5 py-4 space-y-4">
+                {/* Clasificación */}
+                <div>
+                  <label className="text-sm font-medium text-neutral-800">Clasificación de garantía</label>
+                  <select
+                    className="input mt-1 bg-white focus:ring-2 focus:ring-blue-600"
+                    value={clasifValue}
+                    onChange={(e) => setClasifValue(e.target.value)}
+                    disabled={savingClasif}
+                  >
+                    <option value="">Selecciona una opción…</option>
+                    {CLASIF_OPTIONS.map((op) => (
+                      <option key={op} value={op}>{op}</option>
+                    ))}
+                  </select>
+                  {!clasifValue && (
+                    <p className="mt-1 text-xs text-neutral-500">Selecciona una clasificación para continuar.</p>
+                  )}
+                </div>
+
+                {/* Folio SAI */}
+                <div>
+                  <label className="text-sm font-medium text-neutral-800">
+                    Folio SAI <span className="text-neutral-400 font-normal">(opcional)</span>
+                  </label>
+                  <input
+                    className="input mt-1 bg-white focus:ring-2 focus:ring-blue-600"
+                    placeholder="Ej. SAI-2025-001234"
+                    value={folioSaiValue}
+                    onChange={(e) => setFolioSaiValue(e.target.value)}
+                    maxLength={50}
+                    disabled={savingClasif}
+                  />
+                </div>
+
+                {/* Medio de entrega (opcional) */}
+                <div>
+                  <label className="text-sm font-medium text-neutral-800">
+                    Elige el medio de entrega <span className="text-neutral-400 font-normal">(opcional)</span>
+                  </label>
+                  <select
+                    className="input mt-1 bg-white focus:ring-2 focus:ring-blue-600"
+                    value={medioEntregaValue}
+                    onChange={(e) => setMedioEntregaValue(e.target.value)}
+                    disabled={savingClasif}
+                  >
+                    <option value="">Elige una opción</option>
+                    {MEDIO_ENTREGA_OPTIONS.map((op) => (
+                      <option key={op} value={op}>{op}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 py-4 bg-neutral-50 border-t border-neutral-200 flex justify-end gap-2">
+                <button
+                  className="btn"
+                  onClick={() => !savingClasif && setClasifOpen(false)}
+                  disabled={savingClasif}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className={`btn btn-primary ${(!clasifValue || savingClasif) ? "opacity-60 cursor-not-allowed" : ""}`}
+                  disabled={!clasifValue || savingClasif}
+                  onClick={async () => {
+                    try {
+                      setSavingClasif(true);
+                      // PUT con ambas cosas
+                      await setClasificacionGarantia(id, {
+                        clasificacion_garantia: clasifValue,
+                        folio_sai: folioSaiValue || undefined,
+                        medio_entrega: medioEntregaValue || undefined, // <- nuevo
+                      });
+                      await mutCambiar.mutateAsync({ a: "APROBADA", nota });
+
+                      // limpia estado
+                      setClasifOpen(false);
+                      setClasifValue("");
+                      setFolioSaiValue("");
+                      setMedioEntregaValue("");
+                    } catch (err) {
+                      alert(err?.message || "No se pudo aprobar");
+                    } finally {
+                      setSavingClasif(false);
+                    }
+                  }}
+                >
+                  {savingClasif ? "Guardando…" : "Aprobar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Drawer de pieza */}
       <PiezaDrawer
@@ -475,39 +779,37 @@ function PiezaDrawer({
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 bg-black/60 transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        className={`fixed inset-0 bg-black/40 transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
           }`}
         onClick={onClose}
       />
       {/* Panel */}
       <aside
-        className={`fixed inset-y-0 right-0 w-full sm:w-[500px] bg-neutral-900 text-neutral-100 shadow-2xl border-l border-neutral-800 transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"
+        className={`fixed inset-y-0 right-0 w-full sm:w-[500px] bg-white text-neutral-900 shadow-2xl border-l border-neutral-200 transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"
           }`}
         aria-hidden={!open}
       >
         <div className="h-full flex flex-col">
           {/* Header */}
-          <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
+          <div className="p-4 border-b border-neutral-200 flex items-center justify-between bg-white">
             <div>
-              <div className="text-sm font-semibold">
+              <div className="text-sm font-semibold text-neutral-800">
                 {pieza?.clave_prod || "—"}
               </div>
-              <div className="text-xs text-neutral-400">
+              <div className="text-xs text-neutral-500">
                 {pieza?.desc_prod || ""}
               </div>
             </div>
-            <button className="btn" onClick={onClose}>
-              Cerrar
-            </button>
+            <button className="btn" onClick={onClose}>Cerrar</button>
           </div>
 
           {/* Body */}
           <div className="p-4 overflow-auto space-y-4">
-            <div className="rounded-xl overflow-hidden border border-neutral-800">
+            <div className="rounded-xl overflow-hidden border border-neutral-200 bg-neutral-50">
               <img
                 src={pieza?.link_img || PLACEHOLDER}
                 alt={pieza?.desc_prod}
-                className="w-full h-auto object-contain bg-neutral-950"
+                className="w-full h-auto object-contain"
                 onError={(e) => (e.currentTarget.src = PLACEHOLDER)}
               />
             </div>
@@ -545,7 +847,7 @@ function PiezaDrawer({
             </div>
 
             {/* Cantidad + total + agregar */}
-            <div className="p-3 rounded-lg border border-neutral-800 bg-neutral-950">
+            <div className="p-3 rounded-lg border border-neutral-200 bg-neutral-50">
               <div className="text-[11px] uppercase tracking-wide text-neutral-500 mb-2">
                 Cantidad
               </div>
@@ -563,6 +865,7 @@ function PiezaDrawer({
                 >
                   −
                 </button>
+
                 <input
                   className="input w-24 text-center"
                   type="number"
@@ -571,6 +874,7 @@ function PiezaDrawer({
                   value={cantidad}
                   onChange={(e) => setCantidad(e.target.value)}
                 />
+
                 <button
                   className="btn px-2"
                   onClick={() =>
@@ -584,14 +888,16 @@ function PiezaDrawer({
                 >
                   +
                 </button>
+
                 <div className="ml-auto text-sm">
                   Total:{" "}
                   <span className="font-semibold">
                     {qtyValid ? MXN_FORMAT.format(totalPreviewMXN) : "—"}
                   </span>
                 </div>
+
                 <button
-                  className="btn"
+                  className="btn btn-primary"
                   disabled={!pieza || !qtyValid}
                   onClick={onAdd}
                   title={
@@ -615,11 +921,13 @@ function PiezaDrawer({
 
 function Spec({ label, value }) {
   return (
-    <div className="p-3 rounded-lg border border-neutral-800 bg-neutral-950 text-neutral-100">
+    <div className="p-3 rounded-lg border border-neutral-200 bg-white text-neutral-800">
       <div className="text-[11px] uppercase tracking-wide text-neutral-500">
         {label}
       </div>
-      <div className="text-sm font-medium break-words">{value || "—"}</div>
+      <div className="text-sm font-medium break-words">
+        {value || "—"}
+      </div>
     </div>
   );
 }
@@ -646,19 +954,26 @@ function MachinePicker({ value, onChange, onShowParts }) {
               <div
                 className={`w-16 h-16 rounded-full border-2 transition-all duration-200 flex items-center justify-center
                 ${active
-                    ? "border-blue-500 ring-4 ring-blue-500/40 bg-blue-500/10 scale-105"
-                    : "border-neutral-700 group-hover:border-neutral-500"}`}
+                    ? "border-blue-500 ring-4 ring-blue-500/40 bg-blue-50 scale-105"
+                    : "border-neutral-300 bg-neutral-100 group-hover:border-neutral-400"
+                  }`}
               >
                 <img
                   src={img}
                   alt={label}
-                  className={`w-full h-full object-cover rounded-full bg-neutral-800 transition-opacity duration-200
-                  ${active ? "opacity-100" : "opacity-80 group-hover:opacity-100"}`}
+                  className={`w-full h-full object-cover rounded-full transition-opacity duration-200
+                  ${active
+                      ? "opacity-100"
+                      : "opacity-80 group-hover:opacity-100"
+                    }`}
                 />
               </div>
               <span
                 className={`mt-2 text-[12px] w-20 text-center leading-tight transition-colors duration-200
-                ${active ? "text-blue-400 font-semibold" : "text-neutral-300 group-hover:text-neutral-100"}`}
+                ${active
+                    ? "text-blue-600 font-semibold"
+                    : "text-neutral-600 group-hover:text-neutral-800"
+                  }`}
               >
                 {label}
               </span>
@@ -669,7 +984,7 @@ function MachinePicker({ value, onChange, onShowParts }) {
         <button
           type="button"
           onClick={onShowParts}
-          className="ml-2 self-center px-3 py-2 rounded-full border border-neutral-700 text-sm hover:bg-neutral-800 cursor-pointer"
+          className="ml-2 self-center px-3 py-2 rounded-full border border-neutral-300 text-sm text-neutral-700 hover:bg-neutral-100 cursor-pointer"
           title="Ver piezas sugeridas"
         >
           Ver piezas
@@ -683,4 +998,5 @@ function MachinePicker({ value, onChange, onShowParts }) {
     </div>
   );
 }
+
 
