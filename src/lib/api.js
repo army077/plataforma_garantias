@@ -43,8 +43,12 @@ export const setClasificacionGarantia = async (id, payload) =>
   (await api.put(`/solicitudes/${id}`, payload)).data;
 // payload: { clasificacion_garantia, folio_sai }
 // Actualiza la clasificación por ITEM dentro de la solicitud
-export const setClasificacionItem = async (solicitudId, itemId, motivo) =>
-  (await api.put(`/solicitudes/motivo_item/${solicitudId}/items/${itemId}`, { motivo })).data;
+export async function setClasificacionItem(idSolicitud, itemId, data) {
+  return api.put(
+    `/solicitudes/motivo_item/${idSolicitud}/items/${itemId}`,
+    data
+  );
+}
 
 // Cambiar estado de un ITEM
 export const cambiarEstadoItem = async (itemId, payload /* {actor_id, a, nota} */) => {

@@ -14,6 +14,10 @@ import { useEffect, useMemo, useState } from "react";
 import EstadoBadge from "../components/EstadoBadge.jsx";
 import Loader from "../components/Loader.jsx";
 
+/*----------------------- Motivos de garantía ----------------------- */
+
+const MotivoGarantiaOptions = ['Cosmético', 'Ensamble', 'Funcional', 'Descuido técnico', 'Compensación', 'Refacción incorrecta', 'Préstamo', 'Faltante', 'Voltaje fuera de especificación'];
+
 /* ----------------------- Estados permitidos ----------------------- */
 const transiciones = {
   CREADA: ["EN_REVISION", "CANCELADA"],
@@ -284,34 +288,19 @@ export default function SolicitudShow() {
     },
     onError: (e) => alert(e?.response?.data?.error || e.message),
   });
-
-  const mutClasifItem = useMutation({
-    mutationFn: ({ itemId, value }) => setClasificacionItem(id, itemId, value),
-    // Optimistic update opcional
-    onMutate: async ({ itemId, value }) => {
-      await queryClient.cancelQueries({ queryKey: ["solicitud", id] });
-      const prev = queryClient.getQueryData(["solicitud", id]);
-      queryClient.setQueryData(["solicitud", id], (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          items: old.items?.map((it) =>
-            it.id === itemId ? { ...it, motivo: value } : it
-          ),
-        };
-      });
-      return { prev };
-    },
-    onError: (_e, _vars, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData(["solicitud", id], ctx.prev);
-      alert("No se pudo guardar la clasificación del item.");
-    },
-    onSettled: () => {
-      // Si quieres asegurar consistencia
-      queryClient.invalidateQueries({ queryKey: ["solicitud", id] });
-    },
+  // una para el status
+  const mutStatusItem = useMutation({
+    mutationFn: ({ itemId, status }) => setClasificacionItem(id, itemId, { status }),
+    onSuccess: () => queryClient.invalidateQueries(["solicitud", id]),
+    onError: (e) => alert("Error al guardar status: " + e.message),
   });
 
+  // otra para el motivo
+  const mutMotivoItem = useMutation({
+    mutationFn: ({ itemId, motivo }) => setClasificacionItem(id, itemId, { motivo }),
+    onSuccess: () => queryClient.invalidateQueries(["solicitud", id]),
+    onError: (e) => alert("Error al guardar motivo: " + e.message),
+  });
   const acc = transiciones[s?.estado_code] || [];
 
   // helpers cantidad
@@ -354,6 +343,7 @@ export default function SolicitudShow() {
       costo_unitario: p.costo_entrante || 0,
       moneda_precio: p.moneda_precio || "1",
       moneda_costo: p.moneda_costo || "1",
+      status: "SIN_SEGUIMIENTO",
       motivo: "Definir motivo",
       comentarios: "Agregado desde catálogo",
     });
@@ -476,24 +466,43 @@ export default function SolicitudShow() {
                     Cant: {it.cantidad} {it.unidad} • ${it.precio_unitario || 0} • Estado: {it.estado_pieza_code}
                   </div>
                 </div>
-
                 {/* Select de clasificación por item */}
                 <div className="w-64 shrink-0">
-                  <label className="block text-xs text-neutral-500 mb-1">Acciones / Clasificación</label>
+                  <label className="block text-xs text-neutral-500 mb-1">Status de la pieza</label>
                   <select
                     className="input"
-                    value={it.motivo || ""}
+                    value={it.status || ""}
                     onChange={(e) =>
-                      mutClasifItem.mutate({ itemId: it.id, value: e.target.value })
+                      mutStatusItem.mutate({ itemId: it.id, status: e.target.value })
                     }
-                    disabled={mutClasifItem.isLoading && mutClasifItem.variables?.itemId === it.id}
+                    disabled={mutStatusItem.isLoading && mutStatusItem.variables?.itemId === it.id}
                   >
                     <option value="">Elige una opción</option>
                     {ITEM_CLASIF_OPTS.map((op) => (
                       <option key={op} value={op}>{op}</option>
                     ))}
                   </select>
-                  {mutClasifItem.isLoading && mutClasifItem.variables?.itemId === it.id && (
+                  {mutStatusItem.isLoading && mutStatusItem.variables?.itemId === it.id && (
+                    <div className="mt-1 text-xs text-blue-600">Guardando…</div>
+                  )}
+                </div>
+
+                <div className="w-64 shrink-0">
+                  <label className="block text-xs text-neutral-500 mb-1">Motivo de garantía</label>
+                  <select
+                    className="input"
+                    value={it.motivo || ""}
+                    onChange={(e) =>
+                      mutMotivoItem.mutate({ itemId: it.id, motivo: e.target.value })
+                    }
+                    disabled={mutMotivoItem.isLoading && mutMotivoItem.variables?.itemId === it.id}
+                  >
+                    <option value="">Elige una opción</option>
+                    {MotivoGarantiaOptions.map((op) => (
+                      <option key={op} value={op}>{op}</option>
+                    ))}
+                  </select>
+                  {mutMotivoItem.isLoading && mutMotivoItem.variables?.itemId === it.id && (
                     <div className="mt-1 text-xs text-blue-600">Guardando…</div>
                   )}
                 </div>
