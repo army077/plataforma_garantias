@@ -16,7 +16,7 @@ import Loader from "../components/Loader.jsx";
 
 /*----------------------- Motivos de garantía ----------------------- */
 
-const MotivoGarantiaOptions = ['Cosmético', 'Ensamble', 'Funcional', 'Descuido técnico', 'Compensación', 'Refacción incorrecta', 'Préstamo', 'Faltante', 'Voltaje fuera de especificación'];
+const MotivoGarantiaOptions = ['Funcional', 'Descuido técnico', 'Refacción incorrecta', 'Faltante', 'Otro motivo'];
 
 /* ----------------------- Estados permitidos ----------------------- */
 const transiciones = {
@@ -467,45 +467,50 @@ export default function SolicitudShow() {
                   </div>
                 </div>
                 {/* Select de clasificación por item */}
-                <div className="w-64 shrink-0">
-                  <label className="block text-xs text-neutral-500 mb-1">Status de la pieza</label>
-                  <select
-                    className="input"
-                    value={it.status || ""}
-                    onChange={(e) =>
-                      mutStatusItem.mutate({ itemId: it.id, status: e.target.value })
-                    }
-                    disabled={mutStatusItem.isLoading && mutStatusItem.variables?.itemId === it.id}
-                  >
-                    <option value="">Elige una opción</option>
-                    {ITEM_CLASIF_OPTS.map((op) => (
-                      <option key={op} value={op}>{op}</option>
-                    ))}
-                  </select>
-                  {mutStatusItem.isLoading && mutStatusItem.variables?.itemId === it.id && (
-                    <div className="mt-1 text-xs text-blue-600">Guardando…</div>
-                  )}
+                <div className="flex gap-2 items-end">
+                  <div className="w-64 shrink-0">
+                    <label className="block text-xs text-neutral-500 mb-1">Status de la pieza</label>
+                    <select
+                      className="input"
+                      value={it.status || ""}
+                      onChange={(e) =>
+                        mutStatusItem.mutate({ itemId: it.id, status: e.target.value })
+                      }
+                      disabled={mutStatusItem.isLoading && mutStatusItem.variables?.itemId === it.id}
+                    >
+                      <option value="">Elige una opción</option>
+                      {ITEM_CLASIF_OPTS.map((op) => (
+                        <option key={op} value={op}>{op}</option>
+                      ))}
+                    </select>
+                    {mutStatusItem.isLoading && mutStatusItem.variables?.itemId === it.id && (
+                      <div className="mt-1 text-xs text-blue-600">Guardando…</div>
+                    )}
+                  </div>
+
+                  <div className="w-64 shrink-0">
+                    <label className="block text-xs text-neutral-500 mb-1">Motivo de garantía</label>
+                    <select
+                      className="input"
+                      value={it.motivo || ""}
+                      onChange={(e) =>
+                        mutMotivoItem.mutate({ itemId: it.id, motivo: e.target.value })
+                      }
+                      disabled={mutMotivoItem.isLoading && mutMotivoItem.variables?.itemId === it.id}
+                    >
+                      <option value="">Elige una opción</option>
+                      {MotivoGarantiaOptions.map((op) => (
+                        <option key={op} value={op}>{op}</option>
+                      ))}
+                    </select>
+                    {mutMotivoItem.isLoading && mutMotivoItem.variables?.itemId === it.id && (
+                      <div className="mt-1 text-xs text-blue-600">Guardando…</div>
+                    )}
+                  </div>
+
                 </div>
 
-                <div className="w-64 shrink-0">
-                  <label className="block text-xs text-neutral-500 mb-1">Motivo de garantía</label>
-                  <select
-                    className="input"
-                    value={it.motivo || ""}
-                    onChange={(e) =>
-                      mutMotivoItem.mutate({ itemId: it.id, motivo: e.target.value })
-                    }
-                    disabled={mutMotivoItem.isLoading && mutMotivoItem.variables?.itemId === it.id}
-                  >
-                    <option value="">Elige una opción</option>
-                    {MotivoGarantiaOptions.map((op) => (
-                      <option key={op} value={op}>{op}</option>
-                    ))}
-                  </select>
-                  {mutMotivoItem.isLoading && mutMotivoItem.variables?.itemId === it.id && (
-                    <div className="mt-1 text-xs text-blue-600">Guardando…</div>
-                  )}
-                </div>
+
               </div>
             </div>
           ))
