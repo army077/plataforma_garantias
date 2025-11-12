@@ -50,6 +50,14 @@ export async function setClasificacionItem(idSolicitud, itemId, data) {
   );
 }
 
+export async function setDescripcionItem(idSolicitud, itemId, data) {
+  return api.put(`/solicitudes/descripcion_item/${idSolicitud}/items/${itemId}`, data);
+}
+
+export async function setCostoItem(idSolicitud, itemId, data) {
+  return api.put(`/solicitudes/costo_item/${idSolicitud}/items/${itemId}`, data);
+}
+
 // Cambiar estado de un ITEM
 export const cambiarEstadoItem = async (itemId, payload /* {actor_id, a, nota} */) => {
   const { data } = await api.post(`/solicitudes/items/${itemId}/estado`, payload);

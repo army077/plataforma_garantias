@@ -7,6 +7,8 @@ import {
   getSolicitud,
   setClasificacionGarantia,
   setClasificacionItem,
+  setCostoItem,
+  setDescripcionItem,
   addZohoComment
 } from "../lib/api.js";
 import { useParams } from "react-router-dom";
@@ -301,6 +303,28 @@ export default function SolicitudShow() {
     onSuccess: () => queryClient.invalidateQueries(["solicitud", id]),
     onError: (e) => alert("Error al guardar motivo: " + e.message),
   });
+
+  const mutCantidadItem = useMutation({
+    mutationFn: ({ itemId, cantidad }) =>
+      setClasificacionItem(id, itemId, { cantidad }),
+    onSuccess: () => queryClient.invalidateQueries(["solicitud", id]),
+    onError: (e) => alert("Error al guardar cantidad: " + e.message),
+  });
+
+  const mutCostoItem = useMutation({
+    mutationFn: ({ itemId, costo_unitario }) =>
+      setCostoItem(id, itemId, { costo_unitario }),
+    onSuccess: () => queryClient.invalidateQueries(["solicitud", id]),
+    onError: (e) => alert("Error al guardar costo: " + e.message),
+  });
+
+  const mutDescripcionItem = useMutation({
+    mutationFn: ({ itemId, descripcion }) =>
+      setDescripcionItem(id, itemId, { descripcion }),
+    onSuccess: () => queryClient.invalidateQueries(["solicitud", id]),
+    onError: (e) => alert("Error al guardar descripción: " + e.message),
+  });
+
   const acc = transiciones[s?.estado_code] || [];
 
   // helpers cantidad
@@ -455,69 +479,185 @@ export default function SolicitudShow() {
 
       {/* Items actuales */}
       <div className="card">
-        <div className="font-semibold mb-2">Items</div>
+        <div className="font-semibold text-lg mb-4 text-neutral-800 border-b pb-2">
+          Items de la solicitud
+        </div>
+
         {s.items?.length ? (
-          s.items.map((it) => (
-            <div key={it.id} className="py-3 border-b border-neutral-200 last:border-0">
-              <div className="flex justify-between gap-3">
-                <div>
-                  <div className="font-medium">{it.numero_parte} • {it.descripcion}</div>
-                  <div className="text-sm text-neutral-500">
-                    Cant: {it.cantidad} {it.unidad} • ${it.precio_unitario || 0} • Estado: {it.estado_pieza_code}
+          <div className="grid gap-5">
+            {s.items.map((it) => {
+              const esEditable = ["S09999", "S00010"].includes(it.numero_parte);
+
+              return (
+                <div
+                  key={it.id}
+                  className={`rounded-2xl border border-neutral-200 bg-white shadow-sm hover:shadow-md transition-all duration-200 p-5 ${esEditable ? "ring-1 ring-rose-100" : ""
+                    }`}
+                >
+                  {/* Encabezado */}
+                  <div className="flex items-center justify-between mb-4">
+                    {esEditable ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-sm text-neutral-800">
+                          {it.numero_parte}
+                        </span>
+                        <input
+                          type="text"
+                          className="input text-sm w-80"
+                          defaultValue={it.descripcion}
+                          onBlur={(e) =>
+                            mutDescripcionItem.mutate({
+                              itemId: it.id,
+                              descripcion: e.target.value,
+                            })
+                          }
+                        />
+                        {mutDescripcionItem.isLoading &&
+                          mutDescripcionItem.variables?.itemId === it.id && (
+                            <span className="text-xs text-blue-600">Guardando…</span>
+                          )}
+                      </div>
+                    ) : (
+                      <div className="font-semibold text-sm text-neutral-800">
+                        {it.numero_parte} • {it.descripcion}
+                      </div>
+                    )}
+
+                    <div className="text-xs text-neutral-500 uppercase tracking-wide">
+                      ESTADO:{" "}
+                      <span className="font-semibold text-neutral-700">
+                        {it.estado_pieza_code || "—"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Cuerpo */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Cantidad */}
+                    <div className="flex flex-col gap-2 text-sm">
+                      <label className="text-xs text-neutral-500">Cantidad</label>
+                      <input
+                        type="number"
+                        className="input w-24"
+                        step="0.5"
+                        min="0"
+                        defaultValue={it.cantidad}
+                        onBlur={(e) =>
+                          mutCantidadItem.mutate({
+                            itemId: it.id,
+                            cantidad: Number(e.target.value),
+                          })
+                        }
+                      />
+                      <div className="flex justify-between text-xs text-neutral-600 mt-1">
+                        <span>Unidad: {it.unidad}</span>
+                        <span className="font-semibold text-neutral-700">
+                          Total: ${Number(it.costo_total || 0).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Costo */}
+                    <div className="flex flex-col gap-2 text-sm">
+                      {esEditable ? (
+                        <>
+                          <label className="text-xs text-neutral-500">
+                            Costo Unitario
+                          </label>
+                          <input
+                            type="number"
+                            className="input w-32"
+                            step="0.5"
+                            min="0"
+                            defaultValue={it.costo_unitario}
+                            onBlur={(e) =>
+                              mutCostoItem.mutate({
+                                itemId: it.id,
+                                costo_unitario: Number(e.target.value),
+                              })
+                            }
+                          />
+                        </>
+                      ) : (
+                        <div className="text-xs text-neutral-500 mt-4">
+                          Costo:{" "}
+                          <span className="text-neutral-700 font-medium">
+                            ${Number(it.costo_unitario || 0).toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Selects */}
+                    <div className="flex flex-col gap-3 text-sm">
+                      <div>
+                        <label className="text-xs text-neutral-500 mb-1 block">
+                          Status de la pieza
+                        </label>
+                        <select
+                          className="input"
+                          value={it.status || ""}
+                          onChange={(e) =>
+                            mutStatusItem.mutate({
+                              itemId: it.id,
+                              status: e.target.value,
+                            })
+                          }
+                        >
+                          <option value="">Elige una opción</option>
+                          {ITEM_CLASIF_OPTS.map((op) => (
+                            <option key={op} value={op}>
+                              {op}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-neutral-500 mb-1 block">
+                          Motivo de garantía
+                        </label>
+                        <select
+                          className="input"
+                          value={it.motivo || ""}
+                          onChange={(e) =>
+                            mutMotivoItem.mutate({
+                              itemId: it.id,
+                              motivo: e.target.value,
+                            })
+                          }
+                        >
+                          <option value="">Elige una opción</option>
+                          {MotivoGarantiaOptions.map((op) => (
+                            <option key={op} value={op}>
+                              {op}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="mt-4 flex justify-end items-center text-xs text-neutral-500 border-t border-neutral-200 pt-2">
+                    {mutCantidadItem.isLoading &&
+                      mutCantidadItem.variables?.itemId === it.id && (
+                        <span className="text-blue-600">Guardando cantidad…</span>
+                      )}
+                    {mutCostoItem.isLoading &&
+                      mutCostoItem.variables?.itemId === it.id && (
+                        <span className="text-blue-600 ml-4">Guardando costo…</span>
+                      )}
                   </div>
                 </div>
-                {/* Select de clasificación por item */}
-                <div className="flex gap-2 items-end">
-                  <div className="w-64 shrink-0">
-                    <label className="block text-xs text-neutral-500 mb-1">Status de la pieza</label>
-                    <select
-                      className="input"
-                      value={it.status || ""}
-                      onChange={(e) =>
-                        mutStatusItem.mutate({ itemId: it.id, status: e.target.value })
-                      }
-                      disabled={mutStatusItem.isLoading && mutStatusItem.variables?.itemId === it.id}
-                    >
-                      <option value="">Elige una opción</option>
-                      {ITEM_CLASIF_OPTS.map((op) => (
-                        <option key={op} value={op}>{op}</option>
-                      ))}
-                    </select>
-                    {mutStatusItem.isLoading && mutStatusItem.variables?.itemId === it.id && (
-                      <div className="mt-1 text-xs text-blue-600">Guardando…</div>
-                    )}
-                  </div>
-
-                  <div className="w-64 shrink-0">
-                    <label className="block text-xs text-neutral-500 mb-1">Motivo de garantía</label>
-                    <select
-                      className="input"
-                      value={it.motivo || ""}
-                      onChange={(e) =>
-                        mutMotivoItem.mutate({ itemId: it.id, motivo: e.target.value })
-                      }
-                      disabled={mutMotivoItem.isLoading && mutMotivoItem.variables?.itemId === it.id}
-                    >
-                      <option value="">Elige una opción</option>
-                      {MotivoGarantiaOptions.map((op) => (
-                        <option key={op} value={op}>{op}</option>
-                      ))}
-                    </select>
-                    {mutMotivoItem.isLoading && mutMotivoItem.variables?.itemId === it.id && (
-                      <div className="mt-1 text-xs text-blue-600">Guardando…</div>
-                    )}
-                  </div>
-
-                </div>
-
-
-              </div>
-            </div>
-          ))
+              );
+            })}
+          </div>
         ) : (
           <div className="text-sm text-neutral-400">Sin items.</div>
         )}
       </div>
+
 
       {/* Agregar item desde catálogo */}
       <div className="card">
