@@ -5,13 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../auth/AuthProvider.jsx";
 import axios from "axios";
 
-// Responsable por defecto para solicitantes
-const RESPONSABLE_DEFAULT = {
-  id: 3,
-  nombre: "Nohemi Amaya",
-  email: "nohemi.amaya@asiarobotica.com",
-};
-
 export default function SolicitudCreate() {
   const navigate = useNavigate();
   const { zohoId } = useParams();
@@ -31,26 +24,14 @@ export default function SolicitudCreate() {
     observaciones: "",
     ticket_numero: "",
     cliente_nombre: "",
-    ticket_id_externo: "", // Zoho ID
+    ticket_id_externo: "",
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const [clienteLabel, setClienteLabel] = useState("");
   const [ticketLabel, setTicketLabel] = useState("");
 
-  // Prefill responsable y email
-  useEffect(() => {
-    if (user?.email) set("email", user.email);
-
-    if (esSolicitante) {
-      set("usuario_id", RESPONSABLE_DEFAULT.id);
-      setCambiarUsuario(false);
-    } else if (usuarioId) {
-      set("usuario_id", usuarioId);
-    }
-  }, [user?.email, usuarioId, esSolicitante]);
-
-  // Autoprefill por Zoho ID
+  // Autoprefill Zoho
   useEffect(() => {
     if (!zohoId) return;
     (async () => {
@@ -58,6 +39,7 @@ export default function SolicitudCreate() {
         const { data: z } = await axios.get(
           `https://desarrollotecnologicoar.com/api8/ticket/${zohoId}`
         );
+
         const razon = z?.accountDetails?.accountName || "";
         const numeroZoho = z?.ticketNumber || "";
 
@@ -71,27 +53,27 @@ export default function SolicitudCreate() {
         console.error("No pude precargar por Zoho ID:", e);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zohoId]);
+
+  // Prefill usuario/email
+  useEffect(() => {
+    if (user?.email) set("email", user.email);
+
+    // si el toggle está apagado, usamos el usuarioId real
+    if (!cambiarUsuario) {
+      set("usuario_id", usuarioId || null);
+    }
+  }, [user?.email, usuarioId, cambiarUsuario]);
 
   const puedeCambiarUsuario = esGarantias && cambiarUsuario;
 
-  // Carga usuarios (sin búsqueda)
+  // Carga usuarios para admin/garantías
   const { data: usuarios = [], isFetching: fUsuarios } = useQuery({
     queryKey: ["usuarios", puedeCambiarUsuario],
     queryFn: () => listUsuarios("", 0, 20),
     enabled: puedeCambiarUsuario,
-    staleTime: 60_000,
+    staleTime: 60000,
   });
-
-  // Si apagas el toggle, restaurar responsable default/propio
-  useEffect(() => {
-    if (!cambiarUsuario) {
-      if (esSolicitante) set("usuario_id", RESPONSABLE_DEFAULT.id);
-      else if (usuarioId) set("usuario_id", usuarioId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cambiarUsuario]);
 
   const { mutate, isPending } = useMutation({
     mutationFn: createSolicitud,
@@ -137,7 +119,7 @@ export default function SolicitudCreate() {
         </div>
       </div>
 
-      {/* Usuario / Email */}
+      {/* Usuario interno */}
       <section className="grid md:grid-cols-2 gap-3">
         <div className="p-3 rounded-xl border border-neutral-200 bg-white">
           <div className="flex items-center justify-between mb-2">
@@ -158,25 +140,25 @@ export default function SolicitudCreate() {
             )}
           </div>
 
-          {/* Solicitante fijo */}
+          {/* Solicitante: su propio nombre */}
           {esSolicitante && !puedeCambiarUsuario && (
             <input
               className="input"
-              value={`${RESPONSABLE_DEFAULT.nombre} • ${RESPONSABLE_DEFAULT.email}`}
+              value={`${user?.name || ""} • ${user?.email || ""}`}
               disabled
             />
           )}
 
-          {/* Agente/Admin sin cambio */}
+          {/* Garantías/Admin sin toggle */}
           {!esSolicitante && !puedeCambiarUsuario && (
             <input
               className="input"
-              value={`${user?.name || user?.displayName || ""} • ${user?.email || ""}`}
+              value={`${user?.name || ""} • ${user?.email || ""}`}
               disabled
             />
           )}
 
-          {/* Selector de usuarios habilitado */}
+          {/* Selector para cambiar usuario */}
           {puedeCambiarUsuario && (
             <>
               <select
@@ -191,18 +173,17 @@ export default function SolicitudCreate() {
                   </option>
                 ))}
               </select>
+
               {fUsuarios && (
-                <div className="mt-1 text-xs text-neutral-500">Cargando usuarios…</div>
-              )}
-              {form.usuario_id && (
                 <div className="mt-1 text-xs text-neutral-500">
-                  Seleccionado ID: {form.usuario_id}
+                  Cargando usuarios…
                 </div>
               )}
             </>
           )}
         </div>
 
+        {/* Correo del solicitante */}
         <div className="p-3 rounded-xl border border-neutral-200 bg-white">
           <div className="mb-2 text-sm font-medium text-neutral-700">
             Correo del solicitante (contacto)
@@ -213,6 +194,7 @@ export default function SolicitudCreate() {
             onChange={(e) => set("email", e.target.value)}
             disabled={esSolicitante && !cambiarUsuario}
           />
+
           {esSolicitante && !cambiarUsuario && (
             <div className="mt-1 text-xs text-neutral-500">
               Se usa tu correo de sesión.
@@ -221,20 +203,20 @@ export default function SolicitudCreate() {
         </div>
       </section>
 
-      {/* Solo lectura (chips) */}
+      {/* Chips */}
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 mb-2">
         <div className="grid sm:grid-cols-3 gap-2 text-sm">
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 uppercase text-[10px] tracking-wide">
               Cliente
             </span>
-            <span className="font-medium text-neutral-800">{clienteLabel || "—"}</span>
+            <span className="font-medium text-neutral-800">{clienteLabel}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 uppercase text-[10px] tracking-wide">
               Ticket
             </span>
-            <span className="font-medium text-neutral-800">{ticketLabel || "—"}</span>
+            <span className="font-medium text-neutral-800">{ticketLabel}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 uppercase text-[10px] tracking-wide">
@@ -272,6 +254,7 @@ export default function SolicitudCreate() {
               <option value={2}>Foránea</option>
             </select>
           </div>
+
           <div>
             <div className="mb-2 text-sm font-medium text-neutral-700">Gestión</div>
             <select
@@ -301,12 +284,13 @@ export default function SolicitudCreate() {
       {/* Footer */}
       <div className="sticky bottom-0 pt-2 bg-gradient-to-t from-white">
         <div className="flex gap-2 justify-end">
-          <button className="btn" onClick={() => history.back()}>Cancelar</button>
+          <button className="btn" onClick={() => history.back()}>
+            Cancelar
+          </button>
           <button
             className={`btn btn-primary ${!canSubmit ? "opacity-60 cursor-not-allowed" : ""}`}
             disabled={isPending || !canSubmit}
             onClick={handleCrear}
-            title={!canSubmit ? "Completa usuario, email, ticket y cliente" : "Crear"}
           >
             {isPending ? "Creando…" : "Crear"}
           </button>

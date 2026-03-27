@@ -10,6 +10,7 @@ import { useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import EstadoBadge from "../components/EstadoBadge.jsx";
 import Loader from "../components/Loader.jsx";
+import { useAuth } from "../auth/AuthProvider.jsx";
 
 /* ----------------------- Estados permitidos ----------------------- */
 const transiciones = {
@@ -25,6 +26,7 @@ const MXN_FORMAT = new Intl.NumberFormat("es-MX", {
   style: "currency",
   currency: "MXN",
 });
+
 const FX_TO_MXN = { "1": 1, "2": 19.0, "3": 2.59, "4": 21.0, "5": 26.0 };
 const MONEDA_LABEL = {
   "1": "MXN",
@@ -141,6 +143,8 @@ const MACHINE_LABEL = {
 export default function SolicitudShow() {
   const { id } = useParams();
 
+  const { user, role, usuarioId } = useAuth();
+
   const { data: s, isLoading, refetch } = useQuery({
     queryKey: ["solicitud", id],
     queryFn: () => getSolicitud(id),
@@ -196,26 +200,48 @@ export default function SolicitudShow() {
   const qtyValid = !Number.isNaN(qtyNum) && qtyNum >= min;
 
   // precios UI
-  const unitPrice = selected?.precio_venta ?? 0;
-  const unitCur = selected?.moneda_precio ?? "1";
-  const unitPriceMXN = toMXN(unitPrice, unitCur);
-  const totalPreviewMXN = selected && qtyValid ? qtyNum * unitPriceMXN : 0;
+  const costo = selected?.costo_entrante ?? 0;
+  const costoCur = selected?.moneda_costo ?? "1";
+  const costoMXN = toMXN(costo, costoCur);
+  const totalPreviewMXN = selected && qtyValid ? qtyNum * costoMXN : 0;
 
   // Bloquear altas si está en revisión
   const locked = s?.estado_code !== "CREADA";
 
 
-  const openDrawer = (p) => {
-    if (locked) return;              // <- no abrir si está en revisión
-    setSelected({ ...p, link_img: p.link_img || PLACEHOLDER });
+  const openDrawer = async (p) => {
+    if (locked) return; // sigue bloqueando como buen guardia mula
+
+    // Primero muestra skeleton
+    setSelected({ ...p, link_img: null });
     setDrawerOpen(true);
+
+    try {
+      const resp = await fetch(
+        `https://script.google.com/macros/s/AKfycbx2Lj3lBA7Bpu4Uuu_AJh9kCZzK_FZvSpUF4M6Opaxz5OUmYj-1P_poVSX3QB6qkfY/exec?clave=${p.clave_prod}`
+      );
+      const data = await resp.json();
+
+      const base64img = data.base64
+        ? `data:${data.mime};base64,${data.base64}`
+        : PLACEHOLDER;
+
+      setSelected({ ...p, link_img: base64img });
+      setDrawerOpen(true);
+    } catch (err) {
+      console.error("Error al obtener imagen:", err);
+      setSelected({ ...p, link_img: PLACEHOLDER });
+      setDrawerOpen(true);
+    }
   };
 
   const handleAdd = () => {
     if (locked) return;            // <- no permitir si está en revisión
     if (!selected || !qtyValid) return;
     const p = selected;
+    console.log(usuarioId);
     mutAdd.mutate({
+      actor_id: usuarioId,
       producto_id: p.id,
       numero_parte: p.clave_prod,
       descripcion: p.desc_prod,
@@ -447,9 +473,11 @@ export default function SolicitudShow() {
         min={min}
         qtyValid={qtyValid}
         qtyNum={qtyNum}
-        unitPriceMXN={unitPriceMXN}
-        unitCur={unitCur}
-        totalPreviewMXN={totalPreviewMXN}
+
+        costoMXN={costoMXN}          // <--- reemplaza unitPriceMXN
+        costoCur={costoCur}          // <--- reemplaza unitCur
+        totalPreviewMXN={totalPreviewMXN} // este ya estaba bien
+
         onAdd={handleAdd}
         canAdd={!locked}
       />
@@ -467,12 +495,13 @@ function PiezaDrawer({
   min,
   qtyValid,
   qtyNum,
-  unitPriceMXN,
-  unitCur,
+  costoMXN,
+  costoCur,
   totalPreviewMXN,
   onAdd,
   canAdd
 }) {
+  const loading = pieza && pieza.link_img === null;
   return (
     <>
       {/* Backdrop */}
@@ -503,115 +532,132 @@ function PiezaDrawer({
 
           {/* Body */}
           <div className="p-4 overflow-auto space-y-4">
-            <div className="rounded-xl overflow-hidden border border-neutral-200 bg-neutral-50">
-              <img
-                src={pieza?.link_img || PLACEHOLDER}
-                alt={pieza?.desc_prod}
-                className="w-full h-auto object-contain"
-                onError={(e) => (e.currentTarget.src = PLACEHOLDER)}
-              />
-            </div>
+            {loading ? (
+              <div className="w-full h-60 bg-neutral-200 animate-pulse rounded-xl" />
+            ) : (
+              <div className="rounded-xl overflow-hidden border border-neutral-200 bg-neutral-50">
+                <img
+                  src={pieza?.link_img || PLACEHOLDER}
+                  alt={pieza?.desc_prod}
+                  className="w-full h-auto object-contain"
+                  onError={(e) => (e.currentTarget.src = PLACEHOLDER)}
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2 text-sm">
-              <Spec label="Clave" value={pieza?.clave_prod} />
-              <Spec label="Unidad" value={pieza?.uni_med} />
-              <Spec
-                label="Precio lista (MXN)"
-                value={
-                  typeof unitPriceMXN === "number"
-                    ? MXN_FORMAT.format(unitPriceMXN)
-                    : "—"
-                }
-              />
-              <Spec
-                label="Precio original"
-                value={
-                  pieza?.precio_venta != null
-                    ? `$${Number(pieza.precio_venta).toFixed(2)} ${unitCur}`
-                    : "—"
-                }
-              />
-              <Spec
-                label="Costo entrante"
-                value={
-                  pieza?.costo_entrante != null
-                    ? `$${Number(pieza.costo_entrante).toFixed(2)}`
-                    : "—"
-                }
-              />
-              <div className="col-span-2">
-                <Spec label="Descripción" value={pieza?.desc_prod} />
-              </div>
+              {loading ? (
+                <>
+                  <div className="h-16 bg-neutral-200 animate-pulse rounded-lg" />
+                  <div className="h-16 bg-neutral-200 animate-pulse rounded-lg" />
+                  <div className="h-16 bg-neutral-200 animate-pulse rounded-lg" />
+                  <div className="h-16 bg-neutral-200 animate-pulse rounded-lg" />
+                  <div className="h-20 bg-neutral-200 animate-pulse rounded-lg col-span-2" />
+                </>
+              ) : (
+                <>
+                  <Spec label="Clave" value={pieza?.clave_prod} />
+                  <Spec label="Unidad" value={pieza?.uni_med} />
+                  <Spec
+                    label="Precio lista (MXN)"
+                    value={
+                      pieza?.costo_entrante != null
+                        ? MXN_FORMAT.format(costoMXN)
+                        : "—"
+                    }
+                  />
+
+                  <Spec
+                    label="Costo entrante"
+                    value={
+                      pieza?.costo_entrante != null
+                        ? `$${Number(pieza.costo_entrante).toFixed(2)} ${MONEDA_LABEL[costoCur] || "MXN"}`
+                        : "—"
+                    }
+                  />
+                  <div className="col-span-2">
+                    <Spec label="Descripción" value={pieza?.desc_prod} />
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Cantidad + total + agregar */}
-            <div className="p-3 rounded-lg border border-neutral-200 bg-neutral-50">
-              <div className="text-[11px] uppercase tracking-wide text-neutral-500 mb-2">
-                Cantidad
+            {loading ? (
+              <div className="p-3 rounded-lg border border-neutral-200 bg-neutral-50">
+                <div className="h-10 bg-neutral-200 animate-pulse rounded-lg" />
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  className="btn px-2"
-                  onClick={() =>
-                    setCantidad((prev) => {
-                      const n = Number(prev) || min;
-                      return Math.max(min, +(n - step).toFixed(2));
-                    })
-                  }
-                  disabled={!pieza}
-                  title="Menos"
-                >
-                  −
-                </button>
+            ) : (
+              <>
+                {/* Cantidad + total + agregar */}
+                <div className="p-3 rounded-lg border border-neutral-200 bg-neutral-50">
+                  <div className="text-[11px] uppercase tracking-wide text-neutral-500 mb-2">
+                    Cantidad
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="btn px-2"
+                      onClick={() =>
+                        setCantidad((prev) => {
+                          const n = Number(prev) || min;
+                          return Math.max(min, +(n - step).toFixed(2));
+                        })
+                      }
+                      disabled={!pieza}
+                      title="Menos"
+                    >
+                      −
+                    </button>
 
-                <input
-                  className="input w-24 text-center"
-                  type="number"
-                  step={step}
-                  min={min}
-                  value={cantidad}
-                  onChange={(e) => setCantidad(e.target.value)}
-                />
+                    <input
+                      className="input w-24 text-center"
+                      type="number"
+                      step={step}
+                      min={min}
+                      value={cantidad}
+                      onChange={(e) => setCantidad(e.target.value)}
+                    />
 
-                <button
-                  className="btn px-2"
-                  onClick={() =>
-                    setCantidad((prev) => {
-                      const n = Number(prev) || 0;
-                      return +(n + step).toFixed(2);
-                    })
-                  }
-                  disabled={!pieza}
-                  title="Más"
-                >
-                  +
-                </button>
+                    <button
+                      className="btn px-2"
+                      onClick={() =>
+                        setCantidad((prev) => {
+                          const n = Number(prev) || 0;
+                          return +(n + step).toFixed(2);
+                        })
+                      }
+                      disabled={!pieza}
+                      title="Más"
+                    >
+                      +
+                    </button>
 
-                <div className="ml-auto text-sm">
-                  Total:{" "}
-                  <span className="font-semibold">
-                    {qtyValid ? MXN_FORMAT.format(totalPreviewMXN) : "—"}
-                  </span>
+                    <div className="ml-auto text-sm">
+                      Total:{" "}
+                      <span className="font-semibold">
+                        {qtyValid ? MXN_FORMAT.format(totalPreviewMXN) : "—"}
+                      </span>
+                    </div>
+
+                    <button
+                      className="btn btn-primary"
+                      disabled={!pieza || !qtyValid}
+                      onClick={onAdd}
+                      title={
+                        !canAdd
+                          ? "No es posible agregar piezas mientras la solicitud está en revisión"
+                          : !pieza
+                            ? "Selecciona un producto"
+                            : !qtyValid
+                              ? "Cantidad inválida"
+                              : "Agregar"
+                      }
+                    >
+                      Agregar
+                    </button>
+                  </div>
                 </div>
-
-                <button
-                  className="btn btn-primary"
-                  disabled={!pieza || !qtyValid}
-                  onClick={onAdd}
-                  title={
-                    !canAdd
-                      ? "No es posible agregar piezas mientras la solicitud está en revisión"
-                      : !pieza
-                        ? "Selecciona un producto"
-                        : !qtyValid
-                          ? "Cantidad inválida"
-                          : "Agregar"
-                  }
-                >
-                  Agregar
-                </button>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         </div>
       </aside>

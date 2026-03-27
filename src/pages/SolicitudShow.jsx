@@ -4,6 +4,8 @@ import {
   addItem,
   buscarProductos,
   cambiarEstadoSolicitud,
+  setTecnicoSolicitud,
+  cerrarSolicitud,
   getSolicitud,
   setClasificacionGarantia,
   setClasificacionItem,
@@ -15,6 +17,8 @@ import { useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import EstadoBadge from "../components/EstadoBadge.jsx";
 import Loader from "../components/Loader.jsx";
+import { CircularProgress } from "@mui/material";
+import { useAuth } from "../auth/AuthProvider.jsx";
 
 /*----------------------- Motivos de garantía ----------------------- */
 
@@ -22,11 +26,12 @@ const MotivoGarantiaOptions = ['Funcional', 'Descuido técnico', 'Refacción inc
 
 /* ----------------------- Estados permitidos ----------------------- */
 const transiciones = {
-  CREADA: ["EN_REVISION", "CANCELADA"],
-  EN_REVISION: ["APROBADA", "RECHAZADA", "CANCELADA"],
-  APROBADA: ["LIBERADA", "CANCELADA"],
-  LIBERADA: ["ENTREGADA"],
-  ENTREGADA: ["CERRADA"],
+  CREADA: ["EN_REVISION", "CANCELADA", "COMENTARIO ZOHO"],
+  EN_REVISION: ["APROBADA", "RECHAZADA", "CANCELADA", "COMENTARIO ZOHO"],
+  APROBADA: ["LIBERADA", "CANCELADA", "COMENTARIO ZOHO"],
+  LIBERADA: ["ENTREGADA", "COMENTARIO ZOHO"],
+  ENTREGADA: ["CERRADA", "COMENTARIO ZOHO"],
+  CERRADA: ["COMENTARIO ZOHO"],
 };
 
 /* ----------------------- Conversión y etiquetas ----------------------- */
@@ -49,6 +54,7 @@ const CLASIF_OPTIONS = [
   "Garantía de Equipo",
   "Garantía de Componente/ Servicio",
   "Cortesía",
+  "Marketing"
 ];
 
 const MEDIO_ENTREGA_OPTIONS = [
@@ -177,21 +183,28 @@ const ITEM_CLASIF_OPTS = [
 ];
 
 // HTML para comentar en Zoho cuando se entrega
+/*----------------------- HTML para comentario Zoho -----------------------*/
 function buildEntregaHTML(solicitud) {
-  const fmt = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
+  const fmt = new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+  });
   const itemsRows = (solicitud.items || [])
-    .map(it => `
-      <tr>
-        <td>${it.numero_parte || ""}</td>
-        <td>${(it.descripcion || "").replace(/</g, "&lt;")}</td>
-        <td class="num">${it.cantidad ?? ""} ${it.unidad ?? ""}</td>
-        <td class="num">${fmt.format(Number(it.precio_total ?? 0))}</td>
-      </tr>
-    `)
+    .map((it) => {
+      const total = Number(it.costo_unitario || 0) * Number(it.cantidad || 0);
+      return `
+        <tr>
+          <td>${it.numero_parte || ""}</td>
+          <td>${(it.descripcion || "").replace(/</g, "&lt;")}</td>
+          <td class="num">${it.cantidad ?? ""} ${it.unidad ?? ""}</td>
+          <td class="num">${fmt.format(total)}</td>
+        </tr>
+      `;
+    })
     .join("");
 
   return `
-  <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; color:#0f172a;">
+  <div style="font-family: ui-sans-serif, system-ui, Segoe UI, Roboto, Arial; color:#0f172a;">
     <div style="padding:16px; border-radius:12px; background:#f3f4f6; border:1px solid #d1d5db;">
       <h2 style="margin:0 0 6px; font-size:18px;">Orden de Trabajo entregada ✅</h2>
       <div style="font-size:12px; color:#475569; margin-bottom:10px;">Estatus: <strong>PIEZAS ENTREGADAS</strong>.</div>
@@ -222,7 +235,9 @@ function buildEntregaHTML(solicitud) {
           </tr>
         </thead>
         <tbody>
-          ${itemsRows || `<tr><td colspan="4" style="padding:10px; color:#64748b;">Sin items.</td></tr>`}
+          ${itemsRows ||
+    `<tr><td colspan="4" style="padding:10px; color:#64748b;">Sin items.</td></tr>`
+    }
         </tbody>
       </table>
 
@@ -243,10 +258,22 @@ function buildEntregaHTML(solicitud) {
 export default function SolicitudShow() {
   const { id } = useParams();
 
+  const { user, role, usuarioId } = useAuth();
+
   const { data: s, isLoading, refetch } = useQuery({
     queryKey: ["solicitud", id],
     queryFn: () => getSolicitud(id),
   });
+
+  const { data: tecnicos = [] } = useQuery({
+    queryKey: ["tecnicos-activos"],
+    queryFn: async () => {
+      const res = await fetch("https://desarrollotecnologicoar.com/api5/tecnicos");
+      const data = await res.json();
+      return data.filter(t => t.estatus === "Activo");
+    }
+  });
+
 
   const queryClient = useQueryClient();
 
@@ -270,8 +297,12 @@ export default function SolicitudShow() {
   const [machineKey, setMachineKey] = useState("");
   const [partsLoading, setPartsLoading] = useState(false);
 
+  const [showTecnicoModal, setShowTecnicoModal] = useState(false);
+  const [tecnicoAsignado, setTecnicoAsignado] = useState("");
+
+
   const mutCambiar = useMutation({
-    mutationFn: ({ a, nota }) => cambiarEstadoSolicitud(id, a, nota, 4),
+    mutationFn: ({ a, nota }) => cambiarEstadoSolicitud(id, a, nota, usuarioId),
     onSuccess: () => {
       setNota("");
       refetch();
@@ -325,6 +356,13 @@ export default function SolicitudShow() {
     onError: (e) => alert("Error al guardar descripción: " + e.message),
   });
 
+  const mutCerrar = useMutation({
+    mutationFn: (fecha) => cerrarSolicitud(id, fecha),
+    onSuccess: () => refetch(),
+    onError: (e) => alert(e?.response?.data?.error || e.message),
+  });
+
+
   const acc = transiciones[s?.estado_code] || [];
 
   // helpers cantidad
@@ -334,10 +372,10 @@ export default function SolicitudShow() {
   const qtyValid = !Number.isNaN(qtyNum) && qtyNum >= min;
 
   // precios UI
-  const unitPrice = selected?.precio_venta ?? 0;
-  const unitCur = selected?.moneda_precio ?? "1";
-  const unitPriceMXN = toMXN(unitPrice, unitCur);
-  const totalPreviewMXN = selected && qtyValid ? qtyNum * unitPriceMXN : 0;
+  const costo = selected?.costo_entrante ?? 0;
+  const costoCur = selected?.moneda_costo ?? "1";
+  const costoMXN = toMXN(costo, costoCur);
+  const totalPreviewMXN = selected && qtyValid ? qtyNum * costoMXN : 0;
 
   // Modal clasificación para aprobar
   const [clasifOpen, setClasifOpen] = useState(false);
@@ -347,17 +385,42 @@ export default function SolicitudShow() {
   const [folioSaiValue, setFolioSaiValue] = useState("");
   const [medioEntregaValue, setMedioEntregaValue] = useState("");
 
+  // dentro del componente:
+  const [loadingZoho, setLoadingZoho] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
   if (isLoading) return <Loader />;
 
-  const openDrawer = (p) => {
-    setSelected({ ...p, link_img: p.link_img || PLACEHOLDER });
+  const openDrawer = async (p) => {
+    // Primero muestra skeleton
+    setSelected({ ...p, link_img: null });
     setDrawerOpen(true);
+
+    try {
+      const resp = await fetch(
+        `https://script.google.com/macros/s/AKfycbx2Lj3lBA7Bpu4Uuu_AJh9kCZzK_FZvSpUF4M6Opaxz5OUmYj-1P_poVSX3QB6qkfY/exec?clave=${p.clave_prod}`
+      );
+      const data = await resp.json();
+
+      const base64img = data.base64
+        ? `data:${data.mime};base64,${data.base64}`
+        : PLACEHOLDER;
+
+      setSelected({ ...p, link_img: base64img });
+      setDrawerOpen(true);
+    } catch (err) {
+      console.error("Error al obtener imagen:", err);
+      setSelected({ ...p, link_img: PLACEHOLDER });
+      setDrawerOpen(true);
+    }
   };
 
   const handleAdd = () => {
     if (!selected || !qtyValid) return;
     const p = selected;
+    console.log(usuarioId);
     mutAdd.mutate({
+      actor_id: usuarioId,
       producto_id: p.id,
       numero_parte: p.clave_prod,
       descripcion: p.desc_prod,
@@ -424,10 +487,38 @@ export default function SolicitudShow() {
             <div className="font-semibold text-lg">
               Solicitud #{s.id} • {s.cliente_label}
             </div>
+
             <div className="text-sm text-neutral-400">
               Ticket {s.ticket_label} • {new Date(s.creado_en).toLocaleString()}
             </div>
+
+            {/* Enlace Zoho Desk */}
+            {s.ticket_id_externo && (
+              <a
+                href={`https://desk.zoho.com/support/artecnologiasadecv/ShowHomePage.do#Cases/dv/${s.ticket_id_externo}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-blue-500 text-sm mt-1 hover:underline"
+              >
+                Ver en Zoho Desk
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-4 h-4 text-blue-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M14 3h7v7m0-7L10 14m-4 4h7m-7 0v7"
+                  />
+                </svg>
+              </a>
+            )}
           </div>
+
           <EstadoBadge code={s.estado_code} />
         </div>
       </div>
@@ -436,44 +527,72 @@ export default function SolicitudShow() {
       <div className="card">
         <div className="font-semibold mb-2">Acciones</div>
         <div className="flex gap-2 flex-wrap">
-          {acc.map((a) => (
-            <button
-              key={a}
-              className="btn btn-primary"
-              onClick={async () => {
-                // 👇 Caso especial: APROBADA desde EN_REVISION
-                if (a === "APROBADA" && s?.estado_code === "EN_REVISION") {
-                  setClasifOpen(true); // abre modal de clasificación
-                  return;
-                }
-
-                // 👇 Caso especial: ENTREGADA → agrega comentario en Zoho
-                if (a === "ENTREGADA") {
-                  const ticketId = s?.ticket_id_externo; // ajusta al campo real en tu DB
-                  if (ticketId) {
-                    const html = buildEntregaHTML(s); // tu función para armar el HTML bonito
-                    try {
-                      await addZohoComment({ ticketId, message: html, isPublic: true });
-                      console.log("✅ Comentario agregado en Zoho");
-                    } catch (err) {
-                      console.error("❌ Error al enviar comentario a Zoho:", err);
-                    }
-                  }
-                }
-
-                // 👇 Resto de transiciones normales
-                mutCambiar.mutate({ a, nota });
-              }}
-            >
-              {a.replaceAll("_", " ")}
-            </button>
-          ))}
           <input
             className="input w-72"
             placeholder="Nota"
             value={nota}
             onChange={(e) => setNota(e.target.value)}
           />
+          {acc.map((a) => (
+            <button
+              key={a}
+              disabled={loadingZoho}
+              className={`btn flex items-center justify-center gap-2 ${a === "COMENTARIO ZOHO"
+                ? "bg-black text-white hover:bg-neutral-800 cursor-pointer transition-all duration-200 disabled:opacity-60"
+                : "btn-primary"
+                }`}
+              onClick={async () => {
+                // 👇 Caso especial: APROBADA desde EN_REVISION
+                if (a === "APROBADA" && s?.estado_code === "EN_REVISION") {
+                  setClasifOpen(true);
+                  return;
+                }
+
+                if (a === "LIBERADA") {
+                  setShowTecnicoModal(true);
+                  return;
+                }
+
+                // === CASO ESPECIAL: CERRADA ===
+                if (a === "CERRADA") {
+                  const hoy = new Date().toISOString().slice(0, 10);
+                  await mutCerrar.mutateAsync(hoy);   // <--- tu API para fecha_salida
+                }
+
+                // 👇 Caso especial: COMENTARIO ZOHO → agrega comentario, no cambia estado
+                if (a === "COMENTARIO ZOHO") {
+                  const ticketId = s?.ticket_id_externo;
+                  if (!ticketId) {
+                    console.warn("⚠️ No se encontró ticket_id_externo");
+                    return;
+                  }
+
+                  setLoadingZoho(true);
+                  try {
+                    const html = buildEntregaHTML(s);
+                    await addZohoComment({ ticketId, message: html, isPublic: true });
+                    console.log("✅ Comentario agregado manualmente a Zoho");
+                    setShowSuccessModal(true); // 👈 muestra modal
+                  } catch (err) {
+                    console.error("❌ Error al enviar comentario a Zoho:", err);
+                    alert("Error al enviar comentario a Zoho");
+                  } finally {
+                    setLoadingZoho(false);
+                  }
+                  return; // 👈 evita ejecutar mutCambiar.mutate
+                }
+
+                // 👇 Resto de transiciones normales
+                mutCambiar.mutate({ a, nota });
+              }}
+            >
+              {loadingZoho && a === "COMENTARIO ZOHO" ? (
+                <CircularProgress size={18} color="inherit" />
+              ) : (
+                a.replaceAll("_", " ")
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -588,54 +707,54 @@ export default function SolicitudShow() {
                       )}
                     </div>
 
-                    {/* Selects */}
-                    <div className="flex flex-col gap-3 text-sm">
-                      <div>
-                        <label className="text-xs text-neutral-500 mb-1 block">
-                          Status de la pieza
-                        </label>
-                        <select
-                          className="input"
-                          value={it.status || ""}
-                          onChange={(e) =>
-                            mutStatusItem.mutate({
-                              itemId: it.id,
-                              status: e.target.value,
-                            })
-                          }
-                        >
-                          <option value="">Elige una opción</option>
-                          {ITEM_CLASIF_OPTS.map((op) => (
-                            <option key={op} value={op}>
-                              {op}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                    {/* Selects de status y motivo, excepto para la S00010 */}
+                    {it.numero_parte !== "S00010" && (
+                      <div className="flex flex-col gap-3 text-sm">
 
-                      <div>
-                        <label className="text-xs text-neutral-500 mb-1 block">
-                          Motivo de garantía
-                        </label>
-                        <select
-                          className="input"
-                          value={it.motivo || ""}
-                          onChange={(e) =>
-                            mutMotivoItem.mutate({
-                              itemId: it.id,
-                              motivo: e.target.value,
-                            })
-                          }
-                        >
-                          <option value="">Elige una opción</option>
-                          {MotivoGarantiaOptions.map((op) => (
-                            <option key={op} value={op}>
-                              {op}
-                            </option>
-                          ))}
-                        </select>
+                        <div>
+                          <label className="text-xs text-neutral-500 mb-1 block">
+                            Status de la pieza
+                          </label>
+                          <select
+                            className="input"
+                            value={it.status || ""}
+                            onChange={(e) =>
+                              mutStatusItem.mutate({
+                                itemId: it.id,
+                                status: e.target.value,
+                              })
+                            }
+                          >
+                            <option value="">Elige una opción</option>
+                            {ITEM_CLASIF_OPTS.map((op) => (
+                              <option key={op} value={op}>{op}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-neutral-500 mb-1 block">
+                            Motivo de garantía
+                          </label>
+                          <select
+                            className="input"
+                            value={it.motivo || ""}
+                            onChange={(e) =>
+                              mutMotivoItem.mutate({
+                                itemId: it.id,
+                                motivo: e.target.value,
+                              })
+                            }
+                          >
+                            <option value="">Elige una opción</option>
+                            {MotivoGarantiaOptions.map((op) => (
+                              <option key={op} value={op}>{op}</option>
+                            ))}
+                          </select>
+                        </div>
+
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Footer */}
@@ -905,11 +1024,117 @@ export default function SolicitudShow() {
         min={min}
         qtyValid={qtyValid}
         qtyNum={qtyNum}
-        unitPriceMXN={unitPriceMXN}
-        unitCur={unitCur}
-        totalPreviewMXN={totalPreviewMXN}
+
+        costoMXN={costoMXN}          // <--- reemplaza unitPriceMXN
+        costoCur={costoCur}          // <--- reemplaza unitCur
+        totalPreviewMXN={totalPreviewMXN} // este ya estaba bien
+
         onAdd={handleAdd}
+        canAdd={true}
       />
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-[90%] sm:w-[420px] text-center border border-neutral-200 relative">
+            {/* Icono de éxito */}
+            <div className="flex justify-center mb-4">
+              <div className="flex items-center justify-center w-14 h-14 rounded-full bg-green-100 animate-scale-in">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-7 w-7 text-green-600"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Título y mensaje */}
+            <h2 className="text-xl font-semibold text-green-700 mb-1">Comentario agregado</h2>
+            <p className="text-sm text-neutral-600 mb-6">
+              El comentario se publicó correctamente en Zoho.
+            </p>
+
+            {/* Botón */}
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              className="w-full py-2.5 rounded-xl bg-black text-white font-medium hover:bg-neutral-800 transition-all duration-200 shadow-sm"
+            >
+              Aceptar
+            </button>
+          </div>
+
+          {/* Animación sencilla */}
+          <style>
+            {`
+        @keyframes scaleIn {
+          from { transform: scale(0.8); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+        .animate-scale-in {
+          animation: scaleIn 0.3s ease-out;
+        }
+      `}
+          </style>
+        </div>
+      )}
+      {showTecnicoModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl p-6 w-[90%] sm:w-[400px] shadow-xl">
+
+            <h2 className="text-lg font-semibold mb-3">¿Qué técnico atendió?</h2>
+
+            <select
+              className="input w-full"
+              value={tecnicoAsignado}
+              onChange={(e) => setTecnicoAsignado(e.target.value)}
+            >
+              <option value="">Selecciona…</option>
+              {/* Opción extra */}
+              <option value="Cliente Instala">Cliente Instala</option>
+              {tecnicos.map((t) => (
+                <option key={t.id} value={t.nombre_tecnico}>
+                  {t.nombre_tecnico} ({t.sucursal})
+                </option>
+              ))}
+            </select>
+
+            <div className="flex justify-end gap-3 mt-5">
+              <button className="btn" onClick={() => setShowTecnicoModal(false)}>
+                Cancelar
+              </button>
+
+              <button
+                className="btn btn-primary"
+                disabled={!tecnicoAsignado}
+                onClick={async () => {
+                  try {
+                    // 1. Guardar técnico en la solicitud
+                    await setTecnicoSolicitud(id, tecnicoAsignado);
+
+                    // 2. Cambiar estatus a LIBERADA
+                    await mutCambiar.mutateAsync({
+                      a: "LIBERADA",
+                      nota: `Técnico que atendió: ${tecnicoAsignado}`
+                    });
+
+                    setShowTecnicoModal(false);
+                  } catch (err) {
+                    alert("Error guardando técnico" + err);
+                  }
+                }}
+              >
+                Guardar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -924,11 +1149,13 @@ function PiezaDrawer({
   min,
   qtyValid,
   qtyNum,
-  unitPriceMXN,
-  unitCur,
+  costoMXN,
+  costoCur,
   totalPreviewMXN,
   onAdd,
+  canAdd
 }) {
+  const loading = pieza && pieza.link_img === null;
   return (
     <>
       {/* Backdrop */}
@@ -959,113 +1186,132 @@ function PiezaDrawer({
 
           {/* Body */}
           <div className="p-4 overflow-auto space-y-4">
-            <div className="rounded-xl overflow-hidden border border-neutral-200 bg-neutral-50">
-              <img
-                src={pieza?.link_img || PLACEHOLDER}
-                alt={pieza?.desc_prod}
-                className="w-full h-auto object-contain"
-                onError={(e) => (e.currentTarget.src = PLACEHOLDER)}
-              />
-            </div>
+            {loading ? (
+              <div className="w-full h-60 bg-neutral-200 animate-pulse rounded-xl" />
+            ) : (
+              <div className="rounded-xl overflow-hidden border border-neutral-200 bg-neutral-50">
+                <img
+                  src={pieza?.link_img || PLACEHOLDER}
+                  alt={pieza?.desc_prod}
+                  className="w-full h-auto object-contain"
+                  onError={(e) => (e.currentTarget.src = PLACEHOLDER)}
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2 text-sm">
-              <Spec label="Clave" value={pieza?.clave_prod} />
-              <Spec label="Unidad" value={pieza?.uni_med} />
-              <Spec
-                label="Precio lista (MXN)"
-                value={
-                  typeof unitPriceMXN === "number"
-                    ? MXN_FORMAT.format(unitPriceMXN)
-                    : "—"
-                }
-              />
-              <Spec
-                label="Precio original"
-                value={
-                  pieza?.precio_venta != null
-                    ? `$${Number(pieza.precio_venta).toFixed(2)} ${unitCur}`
-                    : "—"
-                }
-              />
-              <Spec
-                label="Costo entrante"
-                value={
-                  pieza?.costo_entrante != null
-                    ? `$${Number(pieza.costo_entrante).toFixed(2)}`
-                    : "—"
-                }
-              />
-              <div className="col-span-2">
-                <Spec label="Descripción" value={pieza?.desc_prod} />
-              </div>
+              {loading ? (
+                <>
+                  <div className="h-16 bg-neutral-200 animate-pulse rounded-lg" />
+                  <div className="h-16 bg-neutral-200 animate-pulse rounded-lg" />
+                  <div className="h-16 bg-neutral-200 animate-pulse rounded-lg" />
+                  <div className="h-16 bg-neutral-200 animate-pulse rounded-lg" />
+                  <div className="h-20 bg-neutral-200 animate-pulse rounded-lg col-span-2" />
+                </>
+              ) : (
+                <>
+                  <Spec label="Clave" value={pieza?.clave_prod} />
+                  <Spec label="Unidad" value={pieza?.uni_med} />
+                  <Spec
+                    label="Precio lista (MXN)"
+                    value={
+                      pieza?.costo_entrante != null
+                        ? MXN_FORMAT.format(costoMXN)
+                        : "—"
+                    }
+                  />
+
+                  <Spec
+                    label="Costo entrante"
+                    value={
+                      pieza?.costo_entrante != null
+                        ? `$${Number(pieza.costo_entrante).toFixed(2)} ${MONEDA_LABEL[costoCur] || "MXN"}`
+                        : "—"
+                    }
+                  />
+                  <div className="col-span-2">
+                    <Spec label="Descripción" value={pieza?.desc_prod} />
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Cantidad + total + agregar */}
-            <div className="p-3 rounded-lg border border-neutral-200 bg-neutral-50">
-              <div className="text-[11px] uppercase tracking-wide text-neutral-500 mb-2">
-                Cantidad
+            {loading ? (
+              <div className="p-3 rounded-lg border border-neutral-200 bg-neutral-50">
+                <div className="h-10 bg-neutral-200 animate-pulse rounded-lg" />
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  className="btn px-2"
-                  onClick={() =>
-                    setCantidad((prev) => {
-                      const n = Number(prev) || min;
-                      return Math.max(min, +(n - step).toFixed(2));
-                    })
-                  }
-                  disabled={!pieza}
-                  title="Menos"
-                >
-                  −
-                </button>
+            ) : (
+              <>
+                {/* Cantidad + total + agregar */}
+                <div className="p-3 rounded-lg border border-neutral-200 bg-neutral-50">
+                  <div className="text-[11px] uppercase tracking-wide text-neutral-500 mb-2">
+                    Cantidad
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="btn px-2"
+                      onClick={() =>
+                        setCantidad((prev) => {
+                          const n = Number(prev) || min;
+                          return Math.max(min, +(n - step).toFixed(2));
+                        })
+                      }
+                      disabled={!pieza}
+                      title="Menos"
+                    >
+                      −
+                    </button>
 
-                <input
-                  className="input w-24 text-center"
-                  type="number"
-                  step={step}
-                  min={min}
-                  value={cantidad}
-                  onChange={(e) => setCantidad(e.target.value)}
-                />
+                    <input
+                      className="input w-24 text-center"
+                      type="number"
+                      step={step}
+                      min={min}
+                      value={cantidad}
+                      onChange={(e) => setCantidad(e.target.value)}
+                    />
 
-                <button
-                  className="btn px-2"
-                  onClick={() =>
-                    setCantidad((prev) => {
-                      const n = Number(prev) || 0;
-                      return +(n + step).toFixed(2);
-                    })
-                  }
-                  disabled={!pieza}
-                  title="Más"
-                >
-                  +
-                </button>
+                    <button
+                      className="btn px-2"
+                      onClick={() =>
+                        setCantidad((prev) => {
+                          const n = Number(prev) || 0;
+                          return +(n + step).toFixed(2);
+                        })
+                      }
+                      disabled={!pieza}
+                      title="Más"
+                    >
+                      +
+                    </button>
 
-                <div className="ml-auto text-sm">
-                  Total:{" "}
-                  <span className="font-semibold">
-                    {qtyValid ? MXN_FORMAT.format(totalPreviewMXN) : "—"}
-                  </span>
+                    <div className="ml-auto text-sm">
+                      Total:{" "}
+                      <span className="font-semibold">
+                        {qtyValid ? MXN_FORMAT.format(totalPreviewMXN) : "—"}
+                      </span>
+                    </div>
+
+                    <button
+                      className="btn btn-primary"
+                      disabled={!pieza || !qtyValid}
+                      onClick={onAdd}
+                      title={
+                        !canAdd
+                          ? "No es posible agregar piezas mientras la solicitud está en revisión"
+                          : !pieza
+                            ? "Selecciona un producto"
+                            : !qtyValid
+                              ? "Cantidad inválida"
+                              : "Agregar"
+                      }
+                    >
+                      Agregar
+                    </button>
+                  </div>
                 </div>
-
-                <button
-                  className="btn btn-primary"
-                  disabled={!pieza || !qtyValid}
-                  onClick={onAdd}
-                  title={
-                    !pieza
-                      ? "Selecciona un producto"
-                      : !qtyValid
-                        ? "Cantidad inválida"
-                        : "Agregar"
-                  }
-                >
-                  Agregar
-                </button>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         </div>
       </aside>

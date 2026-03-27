@@ -23,21 +23,39 @@ export const listTickets = async (q = "", start = 0, end = 20) =>
 
 // Solicitudes
 export const listSolicitudes = async (params = {}) => {
-  const { page = 1, pageSize = 10, q = "", email } = params;
+  const {
+    page = 1,
+    pageSize = 10,
+    q = "",
+    email,
+    estado = "",
+  } = params;
+
   const res = await api.get("/solicitudes", {
     params: {
       _start: (page - 1) * pageSize,
       _end: page * pageSize,
       q,
-      ...(email ? { email } : {}),   // ← manda email o “all”
+      ...(email ? { email } : {}),
+      ...(estado ? { estado } : {}),  // ← clave
     },
   });
-  return { rows: res.data, total: Number(res.headers["x-total-count"] || 0) };
+
+  return {
+    rows: res.data,
+    total: Number(res.headers["x-total-count"] || 0),
+  };
 };
 export const getSolicitud = async (id) => (await api.get(`/solicitudes/${id}`)).data;
 export const createSolicitud = async (payload) => (await api.post("/solicitudes", payload)).data;
 export const cambiarEstadoSolicitud = async (id, a, nota = "", actor_id = 1) =>
   (await api.post(`/solicitudes/${id}/estado`, { a, nota, actor_id })).data;
+export const setTecnicoSolicitud = async (id, tecnico) =>
+  (await api.put(`/solicitudes/tecnico/${id}`, { tecnico })).data;
+
+export const cerrarSolicitud = async (id, fechaSalida) =>
+  (await api.put(`/solicitudes/${id}/cerrar`, { fecha_salida: fechaSalida }))
+    .data;
 
 export const setClasificacionGarantia = async (id, payload) =>
   (await api.put(`/solicitudes/${id}`, payload)).data;
@@ -70,6 +88,92 @@ export const addItem = async (solId, payload) =>
 // Catálogo
 export const buscarProductos = async (q, start = 0, end = 10) =>
   (await api.get("/catalogo/productos", { params: { q, _start: start, _end: end } })).data;
+
+/* ============================================================
+   ALMACÉN
+   ============================================================ */
+
+// GET: movimientos (todas las solicitudes sueltas del almacén)
+export const listAlmacenMovimientos = async () => {
+  const { data } = await api.get("/almacen/movimientos");
+  return data;
+};
+
+// POST: crear movimiento (solicitud simple)
+export const createAlmacenMovimiento = async (payload) => {
+  // payload:
+  // {
+  //   persona,
+  //   estacion,
+  //   orden_produccion,
+  //   numero_parte,
+  //   descripcion,
+  //   cantidad,
+  //   concepto_liberacion
+  // }
+  const { data } = await api.post("/almacen/crear", payload);
+  return data;
+};
+
+export const createAlmacenMovimientoPin = async (payload) =>
+  (await api.post(`/almacen/crear_pin`, payload)).data;
+
+// POST: marcar como atendido
+export const atenderAlmacenMovimiento = async (id, atendio) => {
+  const { data } = await api.post(`/almacen/atender/${id}`, { atendio });
+  return data;
+};
+
+export const atenderAlmacenMovimientoPin = async (id, pin) =>
+  (await api.post(`/almacen/atender_pin/${id}`, { pin })).data;
+
+// GET: buscar producto para kiosko/simple
+export const buscarProductoAlmacen = async (q) => {
+  const { data } = await api.get("/almacen/buscar", { params: { q } });
+  return data;
+};
+
+export const actualizarEstatusMovimiento = async (id, status) =>
+  (await api.put(`/almacen/movimientos/${id}/status`, { status })).data;
+
+// PUT: cerrar todos los movimientos por orden de producción
+export const cerrarMovimientosPorOrden = async (ordenProduccion) => {
+  const { data } = await api.put(
+    `/almacen/movimientos/orden/${ordenProduccion}/cerrar`
+  );
+  return data;
+};
+
+export const cambiarStatusConPin = async (id, nuevo_status, pin) =>
+  (await api.post(`/almacen/cambiar_status_pin/${id}`, { nuevo_status, pin })).data;
+
+export const updateAlmacenMovimiento = async (id, payload) =>
+  (await api.put(`/almacen/movimientos/${id}`, payload)).data;
+
+export const deleteAlmacenMovimiento = async (id) =>
+  (await api.delete(`/almacen/movimientos/${id}`)).data;
+
+//USUARIOS ALMACEN PIN
+export const getUsuariosAlmacen = async () =>
+  (await api.get("/almacen/usuarios_almacen")).data;
+
+export const getUsuarioAlmacen = async (id) =>
+  (await api.get(`/almacen/usuarios_almacen/${id}`)).data;
+
+export const createUsuarioAlmacen = async (payload) =>
+  (await api.post("/almacen/usuarios_almacen", payload)).data;
+
+export const updateUsuarioAlmacen = async (id, payload) =>
+  (await api.put(`/almacen/usuarios_almacen/${id}`, payload)).data;
+
+export const deleteUsuarioAlmacen = async (id) =>
+  (await api.delete(`/almacen/usuarios_almacen/${id}`)).data;
+
+export const resetPinUsuarioAlmacen = async (id, nuevo_pin) =>
+  (await api.put(`/almacen/usuarios_almacen/reset_pin/${id}`, { nuevo_pin })).data;
+
+export const validarPinUsuario = async (pin) =>
+  (await api.post("/almacen/usuarios_almacen/validar_pin", { pin })).data;
 
 //FUERA DE LA API12
 // POST: agregar comentario (HTML) a ticket de Zoho vía tu backend

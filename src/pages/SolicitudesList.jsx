@@ -14,13 +14,16 @@ export default function SolicitudesList() {
 
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
+  const [estado, setEstado] = useState("");
+  const [page, setPage] = useState(1);
 
   const params = useMemo(() => ({
     q,
-    page: 1,
+    estado,
+    page,
     pageSize: 20,
-    email: esGarantias ? "all" : (user?.email || ""),
-  }), [q, esGarantias, user?.email]);
+    email: esGarantias ? "all" : (user?.email || "")
+  }), [q, estado, page, esGarantias, user?.email]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["solicitudes", params],
@@ -28,7 +31,6 @@ export default function SolicitudesList() {
     enabled: !loading && (esGarantias || !!user?.email),
   });
 
-  const runSearch = () => setQ(qInput);
   const keyHandler = (e) => { if (e.key === "Enter") runSearch(); };
 
   if (loading || isLoading) return <Loader />;
@@ -36,52 +38,147 @@ export default function SolicitudesList() {
   const rows = data?.rows || [];
   const buildLink = (id) => (esGarantias ? `/s/${id}` : `/s/${id}/solicitante`);
 
+  const ESTADOS = [
+    "CREADA",
+    "EN_REVISION",
+    "APROBADA",
+    "LIBERADA",
+    "ENTREGADA",
+    "CERRADA",
+    "RECHAZADA",
+    "CANCELADA"
+  ];
+
+  const runSearch = () => {
+    setPage(1);
+    setQ(qInput);
+  };
+
   return (
-    <div>
-      <div className="card mb-4">
-        <div className="flex gap-2">
+    <div className="space-y-4">
+
+      {/* FILTROS */}
+      <div className="card p-4 space-y-3">
+
+        {/* Primera fila: búsqueda + botón + nueva */}
+        <div className="flex flex-wrap gap-2">
+
           <input
-            className="input"
-            placeholder="Buscar por id/ticket/cliente"
+            className="input flex-1"
+            placeholder="Buscar solicitud, ticket o cliente"
             value={qInput}
-            onChange={(e)=>setQInput(e.target.value)}
+            onChange={(e) => setQInput(e.target.value)}
             onKeyDown={keyHandler}
           />
-          <button className="btn" onClick={runSearch}>Buscar</button>
-          <Link to="/create" className="btn">Nueva</Link>
+
+          <button className="btn whitespace-nowrap" onClick={runSearch}>
+            Buscar
+          </button>
+
+          <Link to="/create" className="btn whitespace-nowrap">
+            Nueva
+          </Link>
         </div>
+
+        {/* Segunda fila: select de estado */}
+        <div>
+          <label className="text-xs text-neutral-400">Filtrar por estado</label>
+          <select
+            className="input mt-1"
+            value={estado}
+            onChange={(e) => {
+              setPage(1);
+              setEstado(e.target.value);
+            }}
+          >
+            <option value="">Todos</option>
+            {ESTADOS.map(e => (
+              <option key={e} value={e}>{e}</option>
+            ))}
+          </select>
+        </div>
+
         {!esGarantias && (
-          <div className="mt-2 text-xs text-neutral-500">
-            Viendo solo tus solicitudes: <span className="font-medium">{user?.email}</span>
+          <div className="text-xs text-neutral-500 border-t border-neutral-800 pt-2">
+            Viendo solo tus solicitudes:
+            <span className="font-medium ml-1">{user?.email}</span>
           </div>
         )}
       </div>
 
+      {/* LISTA */}
       <div className="grid gap-2">
         {rows.map((s) => (
-          <Link to={buildLink(s.id)} key={s.id} className="card hover:bg-neutral-900/80">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="font-semibold">
-                  Solicitud #{s.id} • Ticket {s.ticket_numero || s.cliente_label || "N/A"}
+          <Link
+            key={s.id}
+            to={buildLink(s.id)}
+            className="
+          card px-4 py-3
+          hover:bg-neutral-900/70
+          transition-all duration-150
+        "
+          >
+            <div className="flex items-start justify-between gap-4">
+
+              {/* IZQUIERDA */}
+              <div className="space-y-1">
+                <div className="font-semibold text-sm tracking-wide">
+                  Solicitud #{s.id}
+                  <span className="text-neutral-500 ml-1">•</span>
+                  <span className="ml-1">{s.ticket_numero || s.cliente_label || "N/A"}</span>
                 </div>
-                <div className="text-sm text-neutral-400">
+
+                <div className="text-neutral-400 text-sm">
                   {s.cliente_nombre || s.razon_social || "Sin cliente"}
                 </div>
+
                 <div className="text-xs text-neutral-500">
                   {new Date(s.creado_en).toLocaleString()}
                 </div>
               </div>
+
+              {/* DERECHA */}
               <div className="text-right">
                 <EstadoBadge code={s.estado_code} />
+
                 <div className="text-xs text-neutral-400 mt-1">
                   {s.prioridad_nombre || "Sin prioridad"}
                 </div>
               </div>
+
             </div>
           </Link>
         ))}
-        {!rows.length && <div className="text-sm text-neutral-400">Sin resultados.</div>}
+
+        {!rows.length && (
+          <div className="text-sm text-neutral-400 py-6 text-center opacity-70">
+            Sin resultados.
+          </div>
+        )}
+
+        <div className="flex justify-center items-center gap-4 mt-6">
+
+          <button
+            className="btn"
+            disabled={page === 1}
+            onClick={() => setPage(page - 1)}
+          >
+            Anterior
+          </button>
+
+          <span className="text-neutral-400 text-sm">
+            Página {page}
+          </span>
+
+          <button
+            className="btn"
+            disabled={rows.length < 20}
+            onClick={() => setPage(page + 1)}
+          >
+            Siguiente
+          </button>
+
+        </div>
       </div>
     </div>
   );

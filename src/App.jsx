@@ -8,6 +8,8 @@ import SolicitudSolicitante from "./pages/SolicitudSolicitante.jsx";
 import Login from "./pages/Login.jsx";
 import CatalogoPiezas from "./pages/CatalogoPiezas.jsx";
 import MainPage from "./pages/MainPage.jsx";
+import AlmacenPage from "./pages/AlmacenPage.jsx";
+import UsuariosAlmacenPage from "./pages/UsuariosAlmacenPage.jsx";
 
 const ROLES_GARANTIAS = ["garantias", "admin"];
 
@@ -48,6 +50,22 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Private><SolicitudesList /></Private>} />
             <Route path="/main" element={<MainPage />} />
+            <Route
+              path="/almacen"
+              element={
+                <Private roles={[...ROLES_GARANTIAS, "solicitante", "almacen", "supervisor"]}>
+                  <AlmacenPage />
+                </Private>
+              }
+            />
+            <Route
+              path="/almacen/usuarios"
+              element={
+                <Private roles={["admin"]}>
+                  <UsuariosAlmacenPage />
+                </Private>
+              }
+            />
             <Route
               path="/create"
               element={
@@ -122,6 +140,9 @@ function Header() {
           <div className="flex items-center gap-2">
             <button className="btn" onClick={() => nav("/main")}>Nueva</button>
             {!esSolicitante && <button className="btn" onClick={() => nav("/")}>Solicitudes</button>}
+            <button className="btn" onClick={() => nav("/almacen")}>
+              Almacén
+            </button>
             <button className="btn" onClick={signOut}>Salir</button>
           </div>
         ) : (
