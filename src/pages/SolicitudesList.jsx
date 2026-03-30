@@ -55,10 +55,16 @@ export default function SolicitudesList() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+
+      {/* Header */}
+      <div>
+        <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Solicitudes</h1>
+        <p className="text-sm text-slate-500 mt-0.5">Gestiona y consulta las solicitudes de garantía</p>
+      </div>
 
       {/* FILTROS */}
-      <div className="card p-4 space-y-3">
+      <div className="card space-y-3">
 
         {/* Primera fila: búsqueda + botón + nueva */}
         <div className="flex flex-wrap gap-2">
@@ -71,18 +77,18 @@ export default function SolicitudesList() {
             onKeyDown={keyHandler}
           />
 
-          <button className="btn whitespace-nowrap" onClick={runSearch}>
+          <button className="btn" onClick={runSearch}>
             Buscar
           </button>
 
-          <Link to="/create" className="btn whitespace-nowrap">
+          <Link to="/create" className="btn btn-primary">
             Nueva
           </Link>
         </div>
 
         {/* Segunda fila: select de estado */}
         <div>
-          <label className="text-xs text-neutral-400">Filtrar por estado</label>
+          <label className="text-xs text-slate-500 font-medium">Filtrar por estado</label>
           <select
             className="input mt-1"
             value={estado}
@@ -99,9 +105,9 @@ export default function SolicitudesList() {
         </div>
 
         {!esGarantias && (
-          <div className="text-xs text-neutral-500 border-t border-neutral-800 pt-2">
+          <div className="text-xs text-slate-500 border-t border-slate-100 pt-2">
             Viendo solo tus solicitudes:
-            <span className="font-medium ml-1">{user?.email}</span>
+            <span className="font-medium text-slate-700 ml-1">{user?.email}</span>
           </div>
         )}
       </div>
@@ -112,36 +118,32 @@ export default function SolicitudesList() {
           <Link
             key={s.id}
             to={buildLink(s.id)}
-            className="
-          card px-4 py-3
-          hover:bg-neutral-900/70
-          transition-all duration-150
-        "
+            className="card px-4 py-3 hover:border-slate-300 hover:shadow transition-all duration-150"
           >
             <div className="flex items-start justify-between gap-4">
 
               {/* IZQUIERDA */}
               <div className="space-y-1">
-                <div className="font-semibold text-sm tracking-wide">
+                <div className="font-semibold text-sm text-slate-800 tracking-tight">
                   Solicitud #{s.id}
-                  <span className="text-neutral-500 ml-1">•</span>
-                  <span className="ml-1">{s.ticket_numero || s.cliente_label || "N/A"}</span>
+                  <span className="text-slate-300 mx-1">·</span>
+                  <span className="text-slate-600">{s.ticket_numero || s.cliente_label || "N/A"}</span>
                 </div>
 
-                <div className="text-neutral-400 text-sm">
+                <div className="text-slate-500 text-sm">
                   {s.cliente_nombre || s.razon_social || "Sin cliente"}
                 </div>
 
-                <div className="text-xs text-neutral-500">
+                <div className="text-xs text-slate-400">
                   {new Date(s.creado_en).toLocaleString()}
                 </div>
               </div>
 
               {/* DERECHA */}
-              <div className="text-right">
+              <div className="text-right shrink-0">
                 <EstadoBadge code={s.estado_code} />
 
-                <div className="text-xs text-neutral-400 mt-1">
+                <div className="text-xs text-slate-400 mt-1">
                   {s.prioridad_nombre || "Sin prioridad"}
                 </div>
               </div>
@@ -151,12 +153,12 @@ export default function SolicitudesList() {
         ))}
 
         {!rows.length && (
-          <div className="text-sm text-neutral-400 py-6 text-center opacity-70">
+          <div className="text-sm text-slate-400 py-12 text-center">
             Sin resultados.
           </div>
         )}
 
-        <div className="flex justify-center items-center gap-4 mt-6">
+        <div className="flex justify-center items-center gap-4 mt-4">
 
           <button
             className="btn"
@@ -166,7 +168,7 @@ export default function SolicitudesList() {
             Anterior
           </button>
 
-          <span className="text-neutral-400 text-sm">
+          <span className="text-slate-500 text-sm">
             Página {page}
           </span>
 

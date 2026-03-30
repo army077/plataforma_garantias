@@ -284,16 +284,19 @@ export default function AlmacenPage() {
     const paginated = filtrados.slice((page - 1) * pageSize, page * pageSize);
 
     return (
-        <div className="p-4 space-y-4">
+        <div className="space-y-5">
 
-            <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold">Solicitudes de Almacén</h2>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                <div>
+                    <h2 className="text-xl font-semibold text-slate-900 tracking-tight">Solicitudes de Almacén</h2>
+                    <p className="text-sm text-slate-500 mt-0.5">Gestión de movimientos y entregas</p>
+                </div>
 
-                <div className="flex items-center gap-3 ml-auto">
+                <div className="flex items-center gap-2 flex-wrap">
 
                     {role === "admin" && (
                         <button
-                            className="px-4 py-2 rounded-xl border border-neutral-300 bg-neutral-100 hover:bg-neutral-200 text-sm font-semibold text-neutral-700 transition"
+                            className="btn"
                             onClick={() => navigate("/almacen/usuarios")}
                         >
                             Usuarios
@@ -301,7 +304,7 @@ export default function AlmacenPage() {
                     )}
 
                     <select
-                        className="rounded-xl px-3 py-2 border border-neutral-300 shadow-sm bg-white"
+                        className="input w-auto"
                         value={filtroOrden}
                         onChange={(e) => setFiltroOrden(e.target.value)}
                     >
@@ -314,7 +317,7 @@ export default function AlmacenPage() {
                     </select>
 
                     <button
-                        className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition text-sm font-semibold"
+                        className="btn btn-primary"
                         onClick={() => setDrawerOpen(true)}
                     >
                         Nueva solicitud
@@ -322,7 +325,7 @@ export default function AlmacenPage() {
 
                     {(role === "admin" || role === "supervisor") && (
                         <button
-                            className="px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700 transition text-sm font-semibold"
+                            className="btn btn-danger"
                             onClick={() => setCerrarModalOpen(true)}
                         >
                             Cerrar solicitud
@@ -332,17 +335,12 @@ export default function AlmacenPage() {
                 </div>
             </div>
 
-            <div className="card">
-                <div className="bg-white shadow-xl rounded-2xl overflow-hidden border border-neutral-200">
-                    <div className="px-6 py-4 bg-gradient-to-r from-neutral-100 to-neutral-200 border-b border-neutral-300">
-                        <h3 className="text-lg font-semibold tracking-tight text-neutral-800">
-                            Solicitudes registradas
-                        </h3>
-                    </div>
+            <div className="card p-0 overflow-x-auto">
+                <div className="overflow-hidden">
 
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="bg-neutral-100 text-neutral-700 text-xs uppercase tracking-wide border-b border-neutral-300">
+                            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                                 <th className="px-6 py-3 text-left">ID</th>
                                 <th className="px-6 py-3 text-left">Persona</th>
                                 <th className="px-6 py-3 text-left">Orden</th>
@@ -363,31 +361,31 @@ export default function AlmacenPage() {
                             </tr>
                         </thead>
 
-                        <tbody className="divide-y divide-neutral-200">
+                        <tbody className="divide-y divide-slate-100">
                             {paginated.map((r) => (
                                 <tr
                                     key={r.id}
-                                    className="hover:bg-neutral-50 transition cursor-pointer"
+                                    className="hover:bg-blue-50/50 transition cursor-pointer"
                                     onClick={() => {
                                         setDetalle(r);
                                         setModalOpen(true);
                                     }}
                                 >
-                                    <td className="px-6 py-4 font-medium text-neutral-800">{r.id}</td>
+                                    <td className="px-6 py-4 font-medium text-slate-800">{r.id}</td>
 
                                     <td className="px-6 py-4">
-                                        <div className="font-semibold text-neutral-800">
+                                        <div className="font-semibold text-slate-800">
                                             {r.persona}
                                         </div>
-                                        <div className="text-xs text-neutral-400">
+                                        <div className="text-xs text-slate-400">
                                             Estación {r.estacion}
                                         </div>
                                     </td>
 
-                                    <td className="px-6 py-4 text-neutral-700">{r.orden_produccion}</td>
+                                    <td className="px-6 py-4 text-slate-700">{r.orden_produccion}</td>
 
                                     <td className="px-6 py-4">
-                                        <span className="font-mono bg-neutral-100 px-2 py-1 rounded text-neutral-700 border border-neutral-300">
+                                        <span className="font-mono bg-slate-50 px-2 py-1 rounded text-slate-700 border border-slate-200 text-xs">
                                             {r.numero_parte}
                                         </span>
                                     </td>
@@ -455,15 +453,15 @@ export default function AlmacenPage() {
 
                                                 {/* EDITAR */}
                                                 <button
-                                                    className="p-1.5 rounded-lg border border-neutral-300 bg-neutral-50 
-                                                            hover:bg-neutral-100 transition"
+                                                    className="p-1.5 rounded-lg border border-slate-200 bg-white 
+                                                            hover:bg-slate-50 transition"
                                                     title="Editar"
                                                     onClick={() => {
                                                         setEditForm(r);
                                                         setEditModalOpen(true);
                                                     }}
                                                 >
-                                                    <EditIcon className="text-neutral-700" fontSize="small" />
+                                                    <EditIcon className="text-slate-600" fontSize="small" />
                                                 </button>
 
                                                 {/* ELIMINAR */}
@@ -505,21 +503,21 @@ export default function AlmacenPage() {
                     </table>
 
                     {/* PAGINACIÓN */}
-                    <div className="px-6 py-4 flex justify-center items-center gap-3 bg-neutral-50 border-t border-neutral-200">
+                    <div className="px-6 py-4 flex justify-center items-center gap-3 bg-slate-50 border-t border-slate-200">
                         <button
-                            className="px-3 py-1 rounded-lg border border-neutral-300 hover:bg-neutral-100 transition"
+                            className="btn"
                             disabled={page === 1}
                             onClick={() => setPage(page - 1)}
                         >
                             ←
                         </button>
 
-                        <span className="text-sm text-neutral-600">
+                        <span className="text-sm text-slate-600">
                             Página {page} de {totalPages}
                         </span>
 
                         <button
-                            className="px-3 py-1 rounded-lg border border-neutral-300 hover:bg-neutral-100 transition"
+                            className="btn"
                             disabled={page === totalPages}
                             onClick={() => setPage(page + 1)}
                         >
@@ -534,24 +532,24 @@ export default function AlmacenPage() {
                 <>
                     {/* FONDO OSCURO */}
                     <div
-                        className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+                        className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-40"
                         onClick={() => setDrawerOpen(false)}
                     />
 
-                    {/* DRAWER PREMIUM */}
+                    {/* DRAWER */}
                     <aside className="
-                        fixed right-0 top-0 h-full w-full sm:w-[440px]
-                        bg-white shadow-[0_0_45px_rgba(0,0,0,0.15)]
-                        border-l border-neutral-200
+                        fixed right-0 top-0 h-full w-full sm:w-[440px] z-50
+                        bg-white shadow-2xl
+                        border-l border-slate-200
                         flex flex-col
                     ">
                         {/* HEADER */}
-                        <div className="px-6 py-5 border-b border-neutral-200 bg-white/80 backdrop-blur-sm flex items-center justify-between">
-                            <h3 className="text-xl font-semibold text-neutral-900 tracking-tight">
+                        <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+                            <h3 className="text-lg font-semibold text-slate-900 tracking-tight">
                                 Nueva solicitud
                             </h3>
                             <button
-                                className="px-3 py-1 rounded-lg border border-neutral-300 hover:bg-neutral-100 transition"
+                                className="btn"
                                 onClick={() => setDrawerOpen(false)}
                             >
                                 Cerrar
@@ -562,46 +560,46 @@ export default function AlmacenPage() {
                         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
 
                             {/* ----------- DATOS GENERALES ----------- */}
-                            <div className="p-5 rounded-2xl bg-neutral-50 border border-neutral-200 shadow-sm space-y-4">
-                                <h4 className="text-sm font-semibold text-neutral-700 uppercase tracking-wide">
+                            <div className="card space-y-4">
+                                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                                     Datos Generales
                                 </h4>
 
                                 {/* SOLICITANTE POR PIN */}
-                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                    <label className="block text-xs font-bold text-blue-600 uppercase mb-1">
+                                <div className="p-4 rounded-lg border border-blue-100 bg-blue-50/50">
+                                    <label className="block text-xs font-semibold text-blue-600 uppercase mb-1">
                                         Solicitante (Responsable)
                                     </label>
 
                                     <input
-                                        className="w-full p-3 border-2 border-blue-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none font-bold text-slate-800"
+                                        className="input border-blue-200 focus:border-blue-500"
                                         placeholder="Ingresa tu PIN"
                                         value={formHeader.pin}
                                         onChange={e => setFormHeader({ ...formHeader, pin: e.target.value })}
                                         type="text"
                                     />
 
-                                    <p className="text-xs text-blue-400 mt-1">
+                                    <p className="text-xs text-blue-500 mt-1.5">
                                         Ingresa tu PIN personal asignado por almacén.
                                     </p>
                                 </div>
 
                                 <input
-                                    className="w-full rounded-xl px-3 py-2 border border-neutral-300"
+                                    className="input"
                                     placeholder="Estación"
                                     value={formHeader.estacion}
                                     onChange={(e) => setFormHeader({ ...formHeader, estacion: e.target.value })}
                                 />
 
                                 <input
-                                    className="w-full rounded-xl px-3 py-2 border border-neutral-300"
+                                    className="input"
                                     placeholder="Orden de producción"
                                     value={formHeader.orden_produccion}
                                     onChange={(e) => setFormHeader({ ...formHeader, orden_produccion: e.target.value })}
                                 />
 
                                 <select
-                                    className="w-full rounded-xl px-3 py-2 border border-neutral-300"
+                                    className="input"
                                     value={formHeader.concepto_liberacion}
                                     onChange={(e) => setFormHeader({ ...formHeader, concepto_liberacion: e.target.value })}
                                 >
@@ -616,13 +614,13 @@ export default function AlmacenPage() {
 
 
                             {/* ----------- AGREGAR PIEZAS ----------- */}
-                            <div className="p-5 rounded-2xl bg-neutral-50 border border-neutral-200 shadow-sm space-y-4">
-                                <h4 className="text-sm font-semibold text-neutral-700 uppercase tracking-wide">
+                            <div className="card space-y-4">
+                                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                                     Agregar pieza
                                 </h4>
 
                                 <input
-                                    className="w-full rounded-xl px-3 py-2 border border-neutral-300"
+                                    className="input"
                                     placeholder="Buscar número de parte…"
                                     value={search}
                                     onChange={(e) => {
@@ -632,11 +630,11 @@ export default function AlmacenPage() {
                                 />
 
                                 {productos.length > 0 && (
-                                    <div className="border border-neutral-300 rounded-xl bg-white max-h-48 overflow-y-auto divide-y">
+                                    <div className="border border-slate-200 rounded-lg bg-white max-h-48 overflow-y-auto divide-y divide-slate-100">
                                         {productos.map((p) => (
                                             <div
                                                 key={p.id}
-                                                className="px-3 py-2 hover:bg-neutral-100 cursor-pointer"
+                                                className="px-3 py-2 hover:bg-blue-50/50 cursor-pointer transition-colors"
                                                 onClick={() => {
                                                     setCurrentPart({
                                                         numero_parte: p.clave_prod,
@@ -648,14 +646,14 @@ export default function AlmacenPage() {
                                                 }}
                                             >
                                                 <div className="font-semibold">{p.clave_prod}</div>
-                                                <div className="text-xs text-neutral-500">{p.desc_prod}</div>
+                                                <div className="text-xs text-slate-500">{p.desc_prod}</div>
                                             </div>
                                         ))}
                                     </div>
                                 )}
 
                                 <input
-                                    className="w-full rounded-xl px-3 py-2 border border-neutral-300"
+                                    className="input"
                                     placeholder="Número de parte"
                                     value={currentPart.numero_parte}
                                     onChange={(e) =>
@@ -664,7 +662,7 @@ export default function AlmacenPage() {
                                 />
 
                                 <textarea
-                                    className="w-full rounded-xl px-3 py-2 border border-neutral-300"
+                                    className="input"
                                     rows={2}
                                     placeholder="Descripción"
                                     value={currentPart.descripcion}
@@ -674,7 +672,7 @@ export default function AlmacenPage() {
                                 />
 
                                 <input
-                                    className="w-full rounded-xl px-3 py-2 border border-neutral-300"
+                                    className="input"
                                     type="number"
                                     placeholder="Cantidad"
                                     value={currentPart.cantidad}
@@ -684,7 +682,7 @@ export default function AlmacenPage() {
                                 />
 
                                 <button
-                                    className="w-full py-2 rounded-xl bg-neutral-800 text-white hover:bg-neutral-900"
+                                    className="btn w-full"
                                     onClick={agregarPiezaALista}
                                 >
                                     Agregar pieza
@@ -693,8 +691,8 @@ export default function AlmacenPage() {
 
                             {/* ----------- LISTA DE PIEZAS ----------- */}
                             {listaPiezas.length > 0 && (
-                                <div className="p-5 rounded-2xl bg-white border border-neutral-200 shadow-sm space-y-3">
-                                    <h4 className="text-sm font-semibold text-neutral-700 uppercase tracking-wide">
+                                <div className="card space-y-3">
+                                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                                         Piezas agregadas ({listaPiezas.length})
                                     </h4>
 
@@ -702,16 +700,16 @@ export default function AlmacenPage() {
                                         {listaPiezas.map((p, i) => (
                                             <div
                                                 key={i}
-                                                className="flex justify-between items-center p-3 border rounded-xl bg-neutral-50"
+                                                className="flex justify-between items-center p-3 border border-slate-200 rounded-lg bg-slate-50"
                                             >
                                                 <div>
-                                                    <div className="font-semibold">{p.numero_parte}</div>
-                                                    <div className="text-xs text-neutral-500">{p.descripcion}</div>
-                                                    <div className="text-xs font-bold">x{p.cantidad}</div>
+                                                    <div className="font-semibold text-sm text-slate-800">{p.numero_parte}</div>
+                                                    <div className="text-xs text-slate-500">{p.descripcion}</div>
+                                                    <div className="text-xs font-bold text-slate-600">x{p.cantidad}</div>
                                                 </div>
 
                                                 <button
-                                                    className="px-2 py-1 text-xs rounded-lg bg-red-100 text-red-700"
+                                                    className="btn btn-danger text-xs px-2 py-1"
                                                     onClick={() => removerPiezaLista(i)}
                                                 >
                                                     Quitar
@@ -723,10 +721,10 @@ export default function AlmacenPage() {
                             )}
 
                             {/* BOTÓN FINAL */}
-                            <div className="mt-6 pt-4 border-t">
+                            <div className="mt-6 pt-4 border-t border-slate-200">
                                 <button
                                     onClick={handleCrearTodo}
-                                    className="w-full py-3.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg flex items-center justify-center gap-2"
+                                    className="btn btn-primary w-full py-3 flex items-center justify-center gap-2"
                                 >
                                     <span>Guardar Solicitud</span>
                                     {listaPiezas.length > 0 && (
@@ -744,48 +742,48 @@ export default function AlmacenPage() {
             {modalOpen && detalle && (
                 <>
                     <div
-                        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+                        className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-40"
                         onClick={() => setModalOpen(false)}
                     />
 
                     <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-                    bg-white w-[90%] max-w-md rounded-2xl shadow-2xl p-6
-                    z-50 border border-neutral-200">
+                    bg-white w-[90%] max-w-md rounded-xl shadow-2xl p-6
+                    z-50 border border-slate-200">
 
-                        <h3 className="text-xl font-semibold mb-4">Detalle de solicitud</h3>
+                        <h3 className="text-lg font-semibold text-slate-900 mb-4">Detalle de solicitud</h3>
 
                         <div className="space-y-3 text-sm">
 
                             <div>
-                                <span className="font-semibold text-neutral-600">Persona: </span>
-                                <span className="text-neutral-800">{detalle.persona}</span>
+                                <span className="font-semibold text-slate-500">Persona: </span>
+                                <span className="text-slate-800">{detalle.persona}</span>
                             </div>
 
                             <div>
-                                <span className="font-semibold text-neutral-600">Estación: </span>
+                                <span className="font-semibold text-slate-500">Estación: </span>
                                 <span>{detalle.estacion}</span>
                             </div>
 
                             <div>
-                                <span className="font-semibold text-neutral-600">Número de parte: </span>
-                                <span className="font-mono bg-neutral-100 px-2 py-1 rounded border border-neutral-300">
+                                <span className="font-semibold text-slate-500">Número de parte: </span>
+                                <span className="font-mono bg-slate-50 px-2 py-1 rounded border border-slate-200 text-xs">
                                     {detalle.numero_parte}
                                 </span>
                             </div>
 
                             <div>
-                                <span className="font-semibold text-neutral-600">Descripción: </span>
-                                <p className="text-neutral-700">{detalle.descripcion}</p>
+                                <span className="font-semibold text-slate-500">Descripción: </span>
+                                <p className="text-slate-700">{detalle.descripcion}</p>
                             </div>
 
                             <div>
-                                <span className="font-semibold text-neutral-600">Cantidad: </span>
+                                <span className="font-semibold text-slate-500">Cantidad: </span>
                                 <span className="font-semibold">{Number(detalle.cantidad).toFixed(2)}</span>
                             </div>
 
                             <div>
-                                <span className="font-semibold text-neutral-600">Fecha solicitud: </span>
-                                <span className="text-neutral-800">
+                                <span className="font-semibold text-slate-500">Fecha solicitud: </span>
+                                <span className="text-slate-800">
                                     {new Date(detalle.creado_en).toLocaleDateString("es-MX", {
                                         day: "numeric",
                                         month: "short",
@@ -798,7 +796,7 @@ export default function AlmacenPage() {
 
                         <button
                             onClick={() => setModalOpen(false)}
-                            className="mt-5 w-full py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition"
+                            className="btn btn-primary w-full mt-5"
                         >
                             Cerrar
                         </button>
@@ -809,16 +807,16 @@ export default function AlmacenPage() {
             {editModalOpen && editForm && (
                 <>
                     <div
-                        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+                        className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-40"
                         onClick={() => setEditModalOpen(false)}
                     />
 
                     <div className="
                     fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-                    bg-white w-[90%] max-w-md rounded-2xl shadow-2xl p-6
-                    z-50 border border-neutral-200
+                    bg-white w-[90%] max-w-md rounded-xl shadow-2xl p-6
+                    z-50 border border-slate-200
                     ">
-                        <h3 className="text-xl font-semibold mb-4">Editar solicitud</h3>
+                        <h3 className="text-lg font-semibold text-slate-900 mb-4">Editar solicitud</h3>
 
                         <div className="space-y-3 text-sm">
 
@@ -881,14 +879,14 @@ export default function AlmacenPage() {
 
                         <div className="flex gap-3 mt-5">
                             <button
-                                className="flex-1 py-2 rounded-xl bg-neutral-200 hover:bg-neutral-300 transition"
+                                className="btn flex-1"
                                 onClick={() => setEditModalOpen(false)}
                             >
                                 Cancelar
                             </button>
 
                             <button
-                                className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition"
+                                className="btn btn-primary flex-1"
                                 onClick={async () => {
                                     await updateAlmacenMovimiento(editForm.id, editForm);
                                     setEditModalOpen(false);
@@ -905,31 +903,30 @@ export default function AlmacenPage() {
             {pinModalOpen && (
                 <>
                     <div
-                        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+                        className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-40"
                         onClick={() => setPinModalOpen(false)}
                     />
 
                     <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-                        bg-white w-[90%] max-w-sm rounded-2xl shadow-2xl p-6
-                        z-50 border border-neutral-200">
+                        bg-white w-[90%] max-w-sm rounded-xl shadow-2xl p-6
+                        z-50 border border-slate-200">
 
                         <div className="flex flex-col items-center text-center mb-4">
-                            <div className="p-3 bg-blue-100 rounded-full mb-3">
+                            <div className="p-3 bg-blue-50 rounded-full mb-3">
                                 <img src="/lock-icon.svg" className="w-8 h-8" />
                             </div>
-                            <h2 className="text-xl font-bold text-neutral-800">Confirmar Atención</h2>
-                            <p className="text-neutral-500 text-sm mt-1">
+                            <h2 className="text-lg font-semibold text-slate-900">Confirmar Atención</h2>
+                            <p className="text-slate-500 text-sm mt-1">
                                 ¿Quién está atendiendo esta solicitud?
                             </p>
                         </div>
 
-                        <label className="text-xs font-bold text-neutral-600 uppercase">
+                        <label className="text-xs font-semibold text-slate-500 uppercase">
                             Firma / PIN / Nombre
                         </label>
 
                         <input
-                            className="w-full p-3 border border-neutral-300 rounded-xl mt-1 mb-4 
-                           focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="input mt-1 mb-4"
                             placeholder="Ingresa tu clave…"
                             value={pinValue}
                             onChange={(e) => setPinValue(e.target.value)}
@@ -937,7 +934,7 @@ export default function AlmacenPage() {
 
                         <div className="flex justify-between mt-2">
                             <button
-                                className="px-4 py-2 rounded-xl bg-neutral-200 hover:bg-neutral-300"
+                                className="btn"
                                 onClick={() => {
                                     setPinModalOpen(false);
                                     setPinValue("");
@@ -947,7 +944,7 @@ export default function AlmacenPage() {
                             </button>
 
                             <button
-                                className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+                                className="btn btn-primary"
                                 onClick={async () => {
                                     try {
                                         await atenderAlmacenMovimientoPin(movimientoSeleccionado.id, pinValue);
@@ -970,31 +967,30 @@ export default function AlmacenPage() {
             {pinModalStatusOpen && (
                 <>
                     <div
-                        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+                        className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-40"
                         onClick={() => setPinModalStatusOpen(false)}
                     />
 
                     <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-                        bg-white w-[90%] max-w-sm rounded-2xl shadow-2xl p-6
-                        z-50 border border-neutral-200">
+                        bg-white w-[90%] max-w-sm rounded-xl shadow-2xl p-6
+                        z-50 border border-slate-200">
 
                         <div className="flex flex-col items-center text-center mb-4">
-                            <div className="p-3 bg-blue-100 rounded-full mb-3">
+                            <div className="p-3 bg-blue-50 rounded-full mb-3">
                                 <img src="/lock-icon.svg" className="w-8 h-8" />
                             </div>
-                            <h2 className="text-xl font-bold text-neutral-800">Confirmar Entrega</h2>
-                            <p className="text-neutral-500 text-sm mt-1">
+                            <h2 className="text-lg font-semibold text-slate-900">Confirmar Entrega</h2>
+                            <p className="text-slate-500 text-sm mt-1">
                                 ¿Quién está realizando este movimiento?
                             </p>
                         </div>
 
-                        <label className="text-xs font-bold text-neutral-600 uppercase">
+                        <label className="text-xs font-semibold text-slate-500 uppercase">
                             Firma / PIN / Nombre
                         </label>
 
                         <input
-                            className="w-full p-3 border border-neutral-300 rounded-xl mt-1 mb-4 
-                           focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="input mt-1 mb-4"
                             placeholder="Ingresa tu clave…"
                             value={pinStatusValue}
                             onChange={(e) => setPinStatusValue(e.target.value)}
@@ -1002,7 +998,7 @@ export default function AlmacenPage() {
 
                         <div className="flex justify-between mt-2">
                             <button
-                                className="px-4 py-2 rounded-xl bg-neutral-200 hover:bg-neutral-300"
+                                className="btn"
                                 onClick={() => {
                                     setPinModalStatusOpen(false);
                                     setPinStatusValue("");
@@ -1012,7 +1008,7 @@ export default function AlmacenPage() {
                             </button>
 
                             <button
-                                className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+                                className="btn btn-primary"
                                 onClick={async () => {
                                     try {
                                         await cambiarStatusConPin(
@@ -1040,26 +1036,26 @@ export default function AlmacenPage() {
             {cerrarModalOpen && (
                 <>
                     <div
-                        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+                        className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-40"
                         onClick={() => setCerrarModalOpen(false)}
                     />
 
                     <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-            bg-white w-[90%] max-w-sm rounded-2xl shadow-2xl p-6
-            z-50 border border-neutral-200">
+            bg-white w-[90%] max-w-sm rounded-xl shadow-2xl p-6
+            z-50 border border-slate-200">
 
-                        <h3 className="text-xl font-semibold text-neutral-800 mb-4 text-center">
+                        <h3 className="text-lg font-semibold text-slate-900 mb-4 text-center">
                             Cerrar solicitud
                         </h3>
 
                         <div className="space-y-3 text-sm">
 
                             <div>
-                                <label className="text-xs font-bold text-neutral-600 uppercase">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">
                                     PIN
                                 </label>
                                 <input
-                                    className="w-full p-3 border border-neutral-300 rounded-xl mt-1"
+                                    className="input mt-1"
                                     value={pinCerrar}
                                     onChange={(e) => setPinCerrar(e.target.value)}
                                     placeholder="Ingresa tu PIN"
@@ -1067,11 +1063,11 @@ export default function AlmacenPage() {
                             </div>
 
                             <div>
-                                <label className="text-xs font-bold text-neutral-600 uppercase">
+                                <label className="text-xs font-semibold text-slate-500 uppercase">
                                     Orden de producción
                                 </label>
                                 <select
-                                    className="w-full p-3 border border-neutral-300 rounded-xl mt-1 rounded-xl bg-white"
+                                    className="input mt-1"
                                     value={ordenCerrar}
                                     onChange={(e) => setOrdenCerrar(e.target.value)}
                                 >
@@ -1088,7 +1084,7 @@ export default function AlmacenPage() {
 
                         <div className="flex gap-3 mt-5">
                             <button
-                                className="flex-1 py-2 rounded-xl bg-neutral-200 hover:bg-neutral-300"
+                                className="btn flex-1"
                                 onClick={() => {
                                     setCerrarModalOpen(false);
                                     setPinCerrar("");
@@ -1099,7 +1095,7 @@ export default function AlmacenPage() {
                             </button>
 
                             <button
-                                className="flex-1 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700"
+                                className="btn btn-danger flex-1"
                                 onClick={() => {
                                     cerrarSolicitudDummy();
                                     setCerrarModalOpen(false);

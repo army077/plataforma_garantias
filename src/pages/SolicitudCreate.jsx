@@ -113,22 +113,22 @@ export default function SolicitudCreate() {
     <div className="card space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="text-lg font-semibold text-neutral-900">Nueva solicitud</div>
-        <div className="text-xs px-2 py-1 rounded-full border border-neutral-300 bg-neutral-100 text-neutral-700">
+        <div className="text-lg font-semibold text-slate-900">Nueva solicitud</div>
+        <div className="badge bg-slate-100 text-slate-600">
           {role || "sin-rol"}
         </div>
       </div>
 
       {/* Usuario interno */}
       <section className="grid md:grid-cols-2 gap-3">
-        <div className="p-3 rounded-xl border border-neutral-200 bg-white">
+        <div className="p-3 rounded-lg border border-slate-200 bg-white">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-medium text-neutral-700">
+            <div className="text-sm font-medium text-slate-700">
               Usuario interno (responsable)
             </div>
 
             {esGarantias && (
-              <label className="text-xs flex items-center gap-2 cursor-pointer select-none text-neutral-700">
+              <label className="text-xs flex items-center gap-2 cursor-pointer select-none text-slate-600">
                 <input
                   type="checkbox"
                   className="accent-blue-600"
@@ -175,7 +175,7 @@ export default function SolicitudCreate() {
               </select>
 
               {fUsuarios && (
-                <div className="mt-1 text-xs text-neutral-500">
+                <div className="mt-1 text-xs text-slate-500">
                   Cargando usuarios…
                 </div>
               )}
@@ -184,8 +184,8 @@ export default function SolicitudCreate() {
         </div>
 
         {/* Correo del solicitante */}
-        <div className="p-3 rounded-xl border border-neutral-200 bg-white">
-          <div className="mb-2 text-sm font-medium text-neutral-700">
+        <div className="p-3 rounded-lg border border-slate-200 bg-white">
+          <div className="mb-2 text-sm font-medium text-slate-700">
             Correo del solicitante (contacto)
           </div>
           <input
@@ -196,7 +196,7 @@ export default function SolicitudCreate() {
           />
 
           {esSolicitante && !cambiarUsuario && (
-            <div className="mt-1 text-xs text-neutral-500">
+            <div className="mt-1 text-xs text-slate-500">
               Se usa tu correo de sesión.
             </div>
           )}
@@ -204,33 +204,33 @@ export default function SolicitudCreate() {
       </section>
 
       {/* Chips */}
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 mb-2">
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-2">
         <div className="grid sm:grid-cols-3 gap-2 text-sm">
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 uppercase text-[10px] tracking-wide">
+            <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 uppercase text-[10px] tracking-wide font-medium">
               Cliente
             </span>
-            <span className="font-medium text-neutral-800">{clienteLabel}</span>
+            <span className="font-medium text-slate-800">{clienteLabel}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 uppercase text-[10px] tracking-wide">
+            <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 uppercase text-[10px] tracking-wide font-medium">
               Ticket
             </span>
-            <span className="font-medium text-neutral-800">{ticketLabel}</span>
+            <span className="font-medium text-slate-800">{ticketLabel}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 uppercase text-[10px] tracking-wide">
+            <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 uppercase text-[10px] tracking-wide font-medium">
               Zoho ID
             </span>
-            <span className="font-medium text-neutral-800">{zohoId || "—"}</span>
+            <span className="font-medium text-slate-800">{zohoId || "—"}</span>
           </div>
         </div>
       </div>
 
       {/* Parámetros */}
       <section className="grid md:grid-cols-2 gap-3">
-        <div className="p-3 rounded-xl border border-neutral-200 bg-white">
-          <div className="mb-2 text-sm font-medium text-neutral-700">Prioridad</div>
+        <div className="p-3 rounded-lg border border-slate-200 bg-white">
+          <div className="mb-2 text-sm font-medium text-slate-700">Prioridad</div>
           <select
             className="input"
             value={form.prioridad_id}
@@ -242,9 +242,9 @@ export default function SolicitudCreate() {
           </select>
         </div>
 
-        <div className="p-3 rounded-xl border border-neutral-200 bg-white grid md:grid-cols-2 gap-3">
+        <div className="p-3 rounded-lg border border-slate-200 bg-white grid md:grid-cols-2 gap-3">
           <div>
-            <div className="mb-2 text-sm font-medium text-neutral-700">Tipo de garantía</div>
+            <div className="mb-2 text-sm font-medium text-slate-700">Tipo de garantía</div>
             <select
               className="input"
               value={form.tipo_garantia_id}
@@ -256,7 +256,7 @@ export default function SolicitudCreate() {
           </div>
 
           <div>
-            <div className="mb-2 text-sm font-medium text-neutral-700">Gestión</div>
+            <div className="mb-2 text-sm font-medium text-slate-700">Gestión</div>
             <select
               className="input"
               value={form.gestion_garantia_id}
@@ -271,8 +271,8 @@ export default function SolicitudCreate() {
       </section>
 
       {/* Observaciones */}
-      <section className="p-3 rounded-xl border border-neutral-200 bg-white">
-        <div className="mb-2 text-sm font-medium text-neutral-700">Observaciones</div>
+      <section className="p-3 rounded-lg border border-slate-200 bg-white">
+        <div className="mb-2 text-sm font-medium text-slate-700">Observaciones</div>
         <textarea
           className="input h-28"
           placeholder="Describe brevemente el caso"

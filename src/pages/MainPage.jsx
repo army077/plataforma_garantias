@@ -106,7 +106,7 @@ const MainPage = () => {
         gap: 2,
       }}
     >
-      <Typography variant="h4" sx={{ fontWeight: "bold", mb: 1, textAlign: "center" }}>
+      <Typography variant="h4" sx={{ fontWeight: "bold", mb: 1, textAlign: "center", color: "#000" }}>
         Solicita piezas de un ticket
       </Typography>
 

@@ -1,4 +1,4 @@
-// src/pages/SolicitudShow.jsx
+﻿// src/pages/SolicitudShow.jsx
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   addItem,
@@ -21,7 +21,7 @@ const transiciones = {
   ENTREGADA: ["CERRADA"],
 };
 
-/* ----------------------- Conversión y etiquetas ----------------------- */
+/* ----------------------- ConversiÃ³n y etiquetas ----------------------- */
 const MXN_FORMAT = new Intl.NumberFormat("es-MX", {
   style: "currency",
   currency: "MXN",
@@ -53,7 +53,7 @@ function toMXN(amount = 0, moneda = "1") {
   return amount * rate;
 }
 
-/* ----------------------- Hardcode de piezas por máquina ----------------------- */
+/* ----------------------- Hardcode de piezas por mÃ¡quina ----------------------- */
 const machineParts = {
   MAKER0609: [
     "P00178", "P00183", "P00184", "P00185", "P00240", "P00241", "P00243", "P00244", "M00576", "P00295", "P02766",
@@ -114,7 +114,7 @@ const machineParts = {
   ]
 };
 
-// Etiquetas e imágenes de cada máquina (en /public/img/*.png)
+// Etiquetas e imÃ¡genes de cada mÃ¡quina (en /public/img/*.png)
 const MACHINE_META = {
   MAKER0609: { label: "Maker", img: "/img/maker0609.png" },
   BENDWORX: { label: "Bend Worx", img: "/img/bendworx.png" },
@@ -127,7 +127,7 @@ const MACHINE_META = {
   SAAP: { label: "SAAP", img: "/img/saap.png" },
 };
 
-/* Etiquetas “bonitas” para el dropdown */
+/* Etiquetas â€œbonitasâ€ para el dropdown */
 const MACHINE_LABEL = {
   MAKER0609: "Maker",
   BENDWORX: "Bend Worx",
@@ -152,7 +152,7 @@ export default function SolicitudShow() {
 
   const [nota, setNota] = useState("");
 
-  // Búsqueda normal por texto
+  // BÃºsqueda normal por texto
   const [q, setQ] = useState("");
   const [productos, setProductos] = useState([]);
 
@@ -166,7 +166,7 @@ export default function SolicitudShow() {
     setCantidad(1);
   }, [selected?.id]);
 
-  // Submenú de máquinas
+  // SubmenÃº de mÃ¡quinas
   const [machineKey, setMachineKey] = useState("");
   const [partsLoading, setPartsLoading] = useState(false);
 
@@ -205,7 +205,7 @@ export default function SolicitudShow() {
   const costoMXN = toMXN(costo, costoCur);
   const totalPreviewMXN = selected && qtyValid ? qtyNum * costoMXN : 0;
 
-  // Bloquear altas si está en revisión
+  // Bloquear altas si estÃ¡ en revisiÃ³n
   const locked = s?.estado_code !== "CREADA";
 
 
@@ -236,7 +236,7 @@ export default function SolicitudShow() {
   };
 
   const handleAdd = () => {
-    if (locked) return;            // <- no permitir si está en revisión
+    if (locked) return;            // <- no permitir si estÃ¡ en revisiÃ³n
     if (!selected || !qtyValid) return;
     const p = selected;
     console.log(usuarioId);
@@ -252,11 +252,11 @@ export default function SolicitudShow() {
       moneda_precio: p.moneda_precio || "1",
       moneda_costo: p.moneda_costo || "1",
       motivo: "Definir motivo",
-      comentarios: "Agregado desde catálogo",
+      comentarios: "Agregado desde catÃ¡logo",
     });
   };
 
-  // Carga sugerencias por máquina
+  // Carga sugerencias por mÃ¡quina
   const loadMachineParts = async () => {
     if (!machineKey) return;
     const claves = machineParts[machineKey] || [];
@@ -267,7 +267,7 @@ export default function SolicitudShow() {
 
     setPartsLoading(true);
     try {
-      // Buscar por cada clave. Si tu backend soporta múltiple, reemplaza por un endpoint decente.
+      // Buscar por cada clave. Si tu backend soporta mÃºltiple, reemplaza por un endpoint decente.
       const results = await Promise.all(
         claves.map(async (clave) => {
           try {
@@ -307,10 +307,10 @@ export default function SolicitudShow() {
         <div className="flex items-start justify-between">
           <div>
             <div className="font-semibold text-lg">
-              Solicitud #{s.id} • {s.cliente_label}
+              Solicitud #{s.id} â€¢ {s.cliente_label}
             </div>
-            <div className="text-sm text-neutral-400">
-              Ticket {s.ticket_label} • {new Date(s.creado_en).toLocaleString()}
+            <div className="text-sm text-slate-400">
+              Ticket {s.ticket_label} â€¢ {new Date(s.creado_en).toLocaleString()}
             </div>
           </div>
           <EstadoBadge code={s.estado_code} />
@@ -324,39 +324,39 @@ export default function SolicitudShow() {
           s.items.map((it) => (
             <div
               key={it.id}
-              className="flex justify-between py-2 border-b border-neutral-800 last:border-0"
+              className="flex justify-between py-2 border-b border-slate-200 last:border-0"
             >
               <div>
                 <div className="font-medium">
-                  {it.numero_parte} • {it.descripcion}
+                  {it.numero_parte} â€¢ {it.descripcion}
                 </div>
-                <div className="text-sm text-neutral-400">
-                  Cant: {it.cantidad} {it.unidad} • ${it.precio_unitario || 0} •
+                <div className="text-sm text-slate-400">
+                  Cant: {it.cantidad} {it.unidad} â€¢ ${it.precio_unitario || 0} â€¢
                   Estado: {it.estado_pieza_code}
                 </div>
               </div>
-              <div className="text-xs text-neutral-500">
+              <div className="text-xs text-slate-500">
                 {it.folio_sai_liberacion || ""}
               </div>
             </div>
           ))
         ) : (
-          <div className="text-sm text-neutral-400">Sin items.</div>
+          <div className="text-sm text-slate-400">Sin items.</div>
         )}
       </div>
 
-      {/* Agregar item desde catálogo */}
+      {/* Agregar item desde catÃ¡logo */}
       <div className="card">
-        <div className="font-semibold mb-2">Agregar item desde catálogo</div>
+        <div className="font-semibold mb-2">Agregar item desde catÃ¡logo</div>
 
         {locked ? (
           <div className="rounded-xl border border-amber-300/60 bg-amber-50 text-amber-900 p-3">
-            Esta solicitud está <span className="font-semibold">en revisión</span> por parte del área de garantías.
+            Esta solicitud estÃ¡ <span className="font-semibold">en revisiÃ³n</span> por parte del Ã¡rea de garantÃ­as.
             Por ahora no es posible agregar nuevas piezas.
           </div>
         ) : (
           <>
-            {/* Submenú: escoger máquina */}
+            {/* SubmenÃº: escoger mÃ¡quina */}
             <div className="flex flex-col md:flex-row gap-2 md:items-center mb-3">
               <div className="flex items-center gap-2">
                 <div className="flex flex-col gap-2 mb-3">
@@ -381,7 +381,7 @@ export default function SolicitudShow() {
                     <div className="flex gap-2 items-center ml-auto">
                       <input
                         className="input"
-                        placeholder="Buscar por clave o descripción"
+                        placeholder="Buscar por clave o descripciÃ³n"
                         value={q}
                         onChange={(e) => setQ(e.target.value)}
                         onKeyDown={async (e) => {
@@ -411,14 +411,14 @@ export default function SolicitudShow() {
                   title="Ver detalles"
                 >
                   <div className="font-medium">
-                    {p.clave_prod} • {p.desc_prod}
+                    {p.clave_prod} â€¢ {p.desc_prod}
                   </div>
-                  <div className="text-sm text-neutral-400">
-                    {p.uni_med} • Precio:{" "}
+                  <div className="text-sm text-slate-400">
+                    {p.uni_med} â€¢ Precio:{" "}
                     {MXN_FORMAT.format(
                       toMXN(p.precio_venta ?? 0, p.moneda_precio || "1")
                     )}{" "}
-                    <span className="text-neutral-500">
+                    <span className="text-slate-500">
                       ({MONEDA_LABEL[p.moneda_precio || "1"] ?? "MXN"}{" "}
                       {Number(p.precio_venta ?? 0).toFixed(4)})
                     </span>
@@ -426,39 +426,39 @@ export default function SolicitudShow() {
                 </div>
               ))}
               {!productos.length && (
-                <div className="text-sm text-neutral-500">Sin resultados.</div>
+                <div className="text-sm text-slate-500">Sin resultados.</div>
               )}
             </div>
           </>
         )}
       </div>
 
-      {/* Bitácora */}
+      {/* BitÃ¡cora */}
       <div className="card">
-        <div className="font-semibold mb-2 text-neutral-800">Bitácora</div>
+        <div className="font-semibold mb-2 text-slate-800">BitÃ¡cora</div>
         {s.bitacora?.length ? (
           s.bitacora.map((b) => (
             <div
               key={b.id}
-              className="text-sm text-neutral-700 py-2 border-b border-neutral-200 last:border-0"
+              className="text-sm text-slate-700 py-2 border-b border-slate-200 last:border-0"
             >
-              <span className="font-medium text-neutral-800">
+              <span className="font-medium text-slate-800">
                 {new Date(b.ts).toLocaleString()}
               </span>{" "}
-              • {b.accion}{" "}
+              â€¢ {b.accion}{" "}
               {b.de ? (
                 <span className="text-blue-700 font-medium">
-                  ({b.de} → {b.a})
+                  ({b.de} â†’ {b.a})
                 </span>
               ) : null}{" "}
-              {b.nota ? `• ${b.nota}` : ""}{" "}
+              {b.nota ? `â€¢ ${b.nota}` : ""}{" "}
               {b.actor && (
-                <span className="text-neutral-500">• {b.actor}</span>
+                <span className="text-slate-500">â€¢ {b.actor}</span>
               )}
             </div>
           ))
         ) : (
-          <div className="text-sm text-neutral-500">Sin movimientos.</div>
+          <div className="text-sm text-slate-500">Sin movimientos.</div>
         )}
       </div>
 
@@ -506,24 +506,24 @@ function PiezaDrawer({
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 bg-black/40 transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        className={`fixed inset-0 bg-slate-900/30 transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
           }`}
         onClick={onClose}
       />
       {/* Panel */}
       <aside
-        className={`fixed inset-y-0 right-0 w-full sm:w-[500px] bg-white text-neutral-900 shadow-2xl border-l border-neutral-200 transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"
+        className={`fixed inset-y-0 right-0 w-full sm:w-[500px] bg-white text-slate-900 shadow-2xl border-l border-slate-200 transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"
           }`}
         aria-hidden={!open}
       >
         <div className="h-full flex flex-col">
           {/* Header */}
-          <div className="p-4 border-b border-neutral-200 flex items-center justify-between bg-white">
+          <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-white">
             <div>
-              <div className="text-sm font-semibold text-neutral-800">
-                {pieza?.clave_prod || "—"}
+              <div className="text-sm font-semibold text-slate-800">
+                {pieza?.clave_prod || "â€”"}
               </div>
-              <div className="text-xs text-neutral-500">
+              <div className="text-xs text-slate-500">
                 {pieza?.desc_prod || ""}
               </div>
             </div>
@@ -533,9 +533,9 @@ function PiezaDrawer({
           {/* Body */}
           <div className="p-4 overflow-auto space-y-4">
             {loading ? (
-              <div className="w-full h-60 bg-neutral-200 animate-pulse rounded-xl" />
+              <div className="w-full h-60 bg-slate-200 animate-pulse rounded-xl" />
             ) : (
-              <div className="rounded-xl overflow-hidden border border-neutral-200 bg-neutral-50">
+              <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
                 <img
                   src={pieza?.link_img || PLACEHOLDER}
                   alt={pieza?.desc_prod}
@@ -548,11 +548,11 @@ function PiezaDrawer({
             <div className="grid grid-cols-2 gap-2 text-sm">
               {loading ? (
                 <>
-                  <div className="h-16 bg-neutral-200 animate-pulse rounded-lg" />
-                  <div className="h-16 bg-neutral-200 animate-pulse rounded-lg" />
-                  <div className="h-16 bg-neutral-200 animate-pulse rounded-lg" />
-                  <div className="h-16 bg-neutral-200 animate-pulse rounded-lg" />
-                  <div className="h-20 bg-neutral-200 animate-pulse rounded-lg col-span-2" />
+                  <div className="h-16 bg-slate-200 animate-pulse rounded-lg" />
+                  <div className="h-16 bg-slate-200 animate-pulse rounded-lg" />
+                  <div className="h-16 bg-slate-200 animate-pulse rounded-lg" />
+                  <div className="h-16 bg-slate-200 animate-pulse rounded-lg" />
+                  <div className="h-20 bg-slate-200 animate-pulse rounded-lg col-span-2" />
                 </>
               ) : (
                 <>
@@ -563,7 +563,7 @@ function PiezaDrawer({
                     value={
                       pieza?.costo_entrante != null
                         ? MXN_FORMAT.format(costoMXN)
-                        : "—"
+                        : "-"
                     }
                   />
 
@@ -572,7 +572,7 @@ function PiezaDrawer({
                     value={
                       pieza?.costo_entrante != null
                         ? `$${Number(pieza.costo_entrante).toFixed(2)} ${MONEDA_LABEL[costoCur] || "MXN"}`
-                        : "—"
+                        : "-"
                     }
                   />
                   <div className="col-span-2">
@@ -583,14 +583,14 @@ function PiezaDrawer({
             </div>
 
             {loading ? (
-              <div className="p-3 rounded-lg border border-neutral-200 bg-neutral-50">
-                <div className="h-10 bg-neutral-200 animate-pulse rounded-lg" />
+              <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
+                <div className="h-10 bg-slate-200 animate-pulse rounded-lg" />
               </div>
             ) : (
               <>
                 {/* Cantidad + total + agregar */}
-                <div className="p-3 rounded-lg border border-neutral-200 bg-neutral-50">
-                  <div className="text-[11px] uppercase tracking-wide text-neutral-500 mb-2">
+                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
+                  <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">
                     Cantidad
                   </div>
                   <div className="flex items-center gap-2">
@@ -605,7 +605,7 @@ function PiezaDrawer({
                       disabled={!pieza}
                       title="Menos"
                     >
-                      −
+                      -
                     </button>
 
                     <input
@@ -626,7 +626,7 @@ function PiezaDrawer({
                         })
                       }
                       disabled={!pieza}
-                      title="Más"
+                      title="MÃ¡s"
                     >
                       +
                     </button>
@@ -634,7 +634,7 @@ function PiezaDrawer({
                     <div className="ml-auto text-sm">
                       Total:{" "}
                       <span className="font-semibold">
-                        {qtyValid ? MXN_FORMAT.format(totalPreviewMXN) : "—"}
+                        {qtyValid ? MXN_FORMAT.format(totalPreviewMXN) : "â€”"}
                       </span>
                     </div>
 
@@ -644,11 +644,11 @@ function PiezaDrawer({
                       onClick={onAdd}
                       title={
                         !canAdd
-                          ? "No es posible agregar piezas mientras la solicitud está en revisión"
+                          ? "No es posible agregar piezas mientras la solicitud estÃ¡ en revisiÃ³n"
                           : !pieza
                             ? "Selecciona un producto"
                             : !qtyValid
-                              ? "Cantidad inválida"
+                              ? "Cantidad invÃ¡lida"
                               : "Agregar"
                       }
                     >
@@ -667,12 +667,12 @@ function PiezaDrawer({
 
 function Spec({ label, value }) {
   return (
-    <div className="p-3 rounded-lg border border-neutral-200 bg-white text-neutral-800">
-      <div className="text-[11px] uppercase tracking-wide text-neutral-500">
+    <div className="p-3 rounded-lg border border-slate-200 bg-white text-slate-800">
+      <div className="text-[11px] uppercase tracking-wide text-slate-500">
         {label}
       </div>
       <div className="text-sm font-medium break-words">
-        {value || "—"}
+        {value || "â€”"}
       </div>
     </div>
   );
@@ -701,7 +701,7 @@ function MachinePicker({ value, onChange, onShowParts }) {
                 className={`w-16 h-16 rounded-full border-2 transition-all duration-200 flex items-center justify-center
                 ${active
                     ? "border-blue-500 ring-4 ring-blue-500/40 bg-blue-50 scale-105"
-                    : "border-neutral-300 bg-neutral-100 group-hover:border-neutral-400"
+                    : "border-slate-300 bg-slate-100 group-hover:border-slate-400"
                   }`}
               >
                 <img
@@ -718,7 +718,7 @@ function MachinePicker({ value, onChange, onShowParts }) {
                 className={`mt-2 text-[12px] w-20 text-center leading-tight transition-colors duration-200
                 ${active
                     ? "text-blue-600 font-semibold"
-                    : "text-neutral-600 group-hover:text-neutral-800"
+                    : "text-slate-600 group-hover:text-slate-800"
                   }`}
               >
                 {label}
@@ -730,7 +730,7 @@ function MachinePicker({ value, onChange, onShowParts }) {
         <button
           type="button"
           onClick={onShowParts}
-          className="ml-2 self-center px-3 py-2 rounded-full border border-neutral-300 text-sm text-neutral-700 hover:bg-neutral-100 cursor-pointer"
+          className="ml-2 self-center px-3 py-2 rounded-full border border-slate-300 text-sm text-slate-700 hover:bg-slate-100 cursor-pointer"
           title="Ver piezas sugeridas"
         >
           Ver piezas

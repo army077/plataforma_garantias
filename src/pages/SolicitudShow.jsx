@@ -1,4 +1,4 @@
-// src/pages/SolicitudShow.jsx
+﻿// src/pages/SolicitudShow.jsx
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   addItem,
@@ -20,9 +20,9 @@ import Loader from "../components/Loader.jsx";
 import { CircularProgress } from "@mui/material";
 import { useAuth } from "../auth/AuthProvider.jsx";
 
-/*----------------------- Motivos de garantía ----------------------- */
+/*----------------------- Motivos de garantÃƒÆ’Ã‚Â­a ----------------------- */
 
-const MotivoGarantiaOptions = ['Funcional', 'Descuido técnico', 'Refacción incorrecta', 'Faltante', 'Otro motivo'];
+const MotivoGarantiaOptions = ['Funcional', 'Descuido tÃƒÆ’Ã‚Â©cnico', 'RefacciÃƒÆ’Ã‚Â³n incorrecta', 'Faltante', 'Otro motivo'];
 
 /* ----------------------- Estados permitidos ----------------------- */
 const transiciones = {
@@ -34,7 +34,7 @@ const transiciones = {
   CERRADA: ["COMENTARIO ZOHO"],
 };
 
-/* ----------------------- Conversión y etiquetas ----------------------- */
+/* ----------------------- ConversiÃƒÆ’Ã‚Â³n y etiquetas ----------------------- */
 const MXN_FORMAT = new Intl.NumberFormat("es-MX", {
   style: "currency",
   currency: "MXN",
@@ -50,19 +50,19 @@ const MONEDA_LABEL = {
 
 // opciones del combo
 const CLASIF_OPTIONS = [
-  "Instalación",
-  "Garantía de Equipo",
-  "Garantía de Componente/ Servicio",
-  "Cortesía",
+  "InstalaciÃƒÆ’Ã‚Â³n",
+  "GarantÃƒÆ’Ã‚Â­a de Equipo",
+  "GarantÃƒÆ’Ã‚Â­a de Componente/ Servicio",
+  "CortesÃƒÆ’Ã‚Â­a",
   "Marketing"
 ];
 
 const MEDIO_ENTREGA_OPTIONS = [
   "Entrega en sucursal",
-  "Envío por Uber",
-  "Paquetería a domicilio del cliente",
-  "Paquetería ocurre o central",
-  "Envío por grúa interna",
+  "EnvÃƒÆ’Ã‚Â­o por Uber",
+  "PaqueterÃƒÆ’Ã‚Â­a a domicilio del cliente",
+  "PaqueterÃƒÆ’Ã‚Â­a ocurre o central",
+  "EnvÃƒÆ’Ã‚Â­o por grÃƒÆ’Ã‚Âºa interna",
 ];
 
 
@@ -157,7 +157,7 @@ const MACHINE_META = {
   SAAP: { label: "SAAP", img: "/img/saap.png" },
 };
 
-/* Etiquetas “bonitas” para el dropdown */
+/* Etiquetas ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œbonitasÃƒÂ¢Ã¢â€šÂ¬Ã‚Â para el dropdown */
 const MACHINE_LABEL = {
   MAKER0609: "Maker",
   BENDWORX: "Bend Worx",
@@ -172,11 +172,11 @@ const MACHINE_LABEL = {
 
 const ITEM_CLASIF_OPTS = [
   "Pieza sin Seguimiento",
-  "Utilizada y con técnico",
-  "No utilizada y con técnico",
-  "En almacén AR",
+  "Utilizada y con tÃƒÆ’Ã‚Â©cnico",
+  "No utilizada y con tÃƒÆ’Ã‚Â©cnico",
+  "En almacÃƒÆ’Ã‚Â©n AR",
   "Con el Cliente",
-  "Utilizada y con Garantías",
+  "Utilizada y con GarantÃƒÆ’Ã‚Â­as",
   "Utilizada y en CDMX",
   "Utilizada y en MTY",
   "Utilizada y en Ocotlán",
@@ -206,7 +206,7 @@ function buildEntregaHTML(solicitud) {
   return `
   <div style="font-family: ui-sans-serif, system-ui, Segoe UI, Roboto, Arial; color:#0f172a;">
     <div style="padding:16px; border-radius:12px; background:#f3f4f6; border:1px solid #d1d5db;">
-      <h2 style="margin:0 0 6px; font-size:18px;">Orden de Trabajo entregada ✅</h2>
+      <h2 style="margin:0 0 6px; font-size:18px;">Orden de Trabajo entregada ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦</h2>
       <div style="font-size:12px; color:#475569; margin-bottom:10px;">Estatus: <strong>PIEZAS ENTREGADAS</strong>.</div>
 
       <table style="width:100%; border-collapse:separate; border-spacing:0 8px; font-size:13px;">
@@ -215,7 +215,7 @@ function buildEntregaHTML(solicitud) {
           <td style="font-weight:600;">Nohemi Amaya</td>
         </tr>
         <tr>
-          <td style="color:#64748b;">Clasificación de Garantía:</td>
+          <td style="color:#64748b;">ClasificaciÃƒÆ’Ã‚Â³n de GarantÃƒÆ’Ã‚Â­a:</td>
           <td>${solicitud.clasificacion_garantia || "-"}</td>
         </tr>
         <tr>
@@ -228,8 +228,8 @@ function buildEntregaHTML(solicitud) {
       <table style="width:100%; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; font-size:13px;">
         <thead>
           <tr style="background:#ef4444; color:white;">
-            <th style="text-align:left; padding:8px 10px; width:120px;">Número</th>
-            <th style="text-align:left; padding:8px 10px;">Descripción</th>
+            <th style="text-align:left; padding:8px 10px; width:120px;">NÃƒÆ’Ã‚Âºmero</th>
+            <th style="text-align:left; padding:8px 10px;">DescripciÃƒÆ’Ã‚Â³n</th>
             <th style="text-align:right; padding:8px 10px; width:140px;">Cantidad</th>
             <th style="text-align:right; padding:8px 10px; width:140px;">Precio total</th>
           </tr>
@@ -248,7 +248,7 @@ function buildEntregaHTML(solicitud) {
       </style>
 
       <div style="margin-top:12px; font-size:12px; color:#64748b;">
-        Generado automáticamente por la plataforma de garantías.
+        Generado automáticamente por la plataforma de garantÃƒÆ’Ã‚Â­as.
       </div>
     </div>
   </div>`;
@@ -279,7 +279,7 @@ export default function SolicitudShow() {
 
   const [nota, setNota] = useState("");
 
-  // Búsqueda normal por texto
+  // BÃƒÆ’Ã‚Âºsqueda normal por texto
   const [q, setQ] = useState("");
   const [productos, setProductos] = useState([]);
 
@@ -293,7 +293,7 @@ export default function SolicitudShow() {
     setCantidad(1);
   }, [selected?.id]);
 
-  // Submenú de máquinas
+  // SubmenÃƒÆ’Ã‚Âº de máquinas
   const [machineKey, setMachineKey] = useState("");
   const [partsLoading, setPartsLoading] = useState(false);
 
@@ -353,7 +353,7 @@ export default function SolicitudShow() {
     mutationFn: ({ itemId, descripcion }) =>
       setDescripcionItem(id, itemId, { descripcion }),
     onSuccess: () => queryClient.invalidateQueries(["solicitud", id]),
-    onError: (e) => alert("Error al guardar descripción: " + e.message),
+    onError: (e) => alert("Error al guardar descripciÃƒÆ’Ã‚Â³n: " + e.message),
   });
 
   const mutCerrar = useMutation({
@@ -377,7 +377,7 @@ export default function SolicitudShow() {
   const costoMXN = toMXN(costo, costoCur);
   const totalPreviewMXN = selected && qtyValid ? qtyNum * costoMXN : 0;
 
-  // Modal clasificación para aprobar
+  // Modal clasificaciÃƒÆ’Ã‚Â³n para aprobar
   const [clasifOpen, setClasifOpen] = useState(false);
   const [clasifValue, setClasifValue] = useState("");
   const [savingClasif, setSavingClasif] = useState(false);
@@ -447,7 +447,7 @@ export default function SolicitudShow() {
 
     setPartsLoading(true);
     try {
-      // Buscar por cada clave. Si tu backend soporta múltiple, reemplaza por un endpoint decente.
+      // Buscar por cada clave. Si tu backend soporta mÃƒÆ’Ã‚Âºltiple, reemplaza por un endpoint decente.
       const results = await Promise.all(
         claves.map(async (clave) => {
           try {
@@ -485,11 +485,11 @@ export default function SolicitudShow() {
         <div className="flex items-start justify-between">
           <div>
             <div className="font-semibold text-lg">
-              Solicitud #{s.id} • {s.cliente_label}
+              Solicitud #{s.id} - {s.cliente_label}
             </div>
 
-            <div className="text-sm text-neutral-400">
-              Ticket {s.ticket_label} • {new Date(s.creado_en).toLocaleString()}
+            <div className="text-sm text-slate-400">
+              Ticket {s.ticket_label} - {new Date(s.creado_en).toLocaleString()}
             </div>
 
             {/* Enlace Zoho Desk */}
@@ -538,11 +538,11 @@ export default function SolicitudShow() {
               key={a}
               disabled={loadingZoho}
               className={`btn flex items-center justify-center gap-2 ${a === "COMENTARIO ZOHO"
-                ? "bg-black text-white hover:bg-neutral-800 cursor-pointer transition-all duration-200 disabled:opacity-60"
+                ? "bg-slate-900 text-white hover:bg-slate-800 cursor-pointer transition-all duration-200 disabled:opacity-60"
                 : "btn-primary"
                 }`}
               onClick={async () => {
-                // 👇 Caso especial: APROBADA desde EN_REVISION
+                // ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ¢â‚¬Â¡ Caso especial: APROBADA desde EN_REVISION
                 if (a === "APROBADA" && s?.estado_code === "EN_REVISION") {
                   setClasifOpen(true);
                   return;
@@ -559,11 +559,11 @@ export default function SolicitudShow() {
                   await mutCerrar.mutateAsync(hoy);   // <--- tu API para fecha_salida
                 }
 
-                // 👇 Caso especial: COMENTARIO ZOHO → agrega comentario, no cambia estado
+                // ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ¢â‚¬Â¡ Caso especial: COMENTARIO ZOHO ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ agrega comentario, no cambia estado
                 if (a === "COMENTARIO ZOHO") {
                   const ticketId = s?.ticket_id_externo;
                   if (!ticketId) {
-                    console.warn("⚠️ No se encontró ticket_id_externo");
+                    console.warn("ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â No se encontrÃƒÆ’Ã‚Â³ ticket_id_externo");
                     return;
                   }
 
@@ -571,18 +571,18 @@ export default function SolicitudShow() {
                   try {
                     const html = buildEntregaHTML(s);
                     await addZohoComment({ ticketId, message: html, isPublic: true });
-                    console.log("✅ Comentario agregado manualmente a Zoho");
-                    setShowSuccessModal(true); // 👈 muestra modal
+                    console.log("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Comentario agregado manualmente a Zoho");
+                    setShowSuccessModal(true); // ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‹â€  muestra modal
                   } catch (err) {
-                    console.error("❌ Error al enviar comentario a Zoho:", err);
+                    console.error("ÃƒÂ¢Ã‚ÂÃ…â€™ Error al enviar comentario a Zoho:", err);
                     alert("Error al enviar comentario a Zoho");
                   } finally {
                     setLoadingZoho(false);
                   }
-                  return; // 👈 evita ejecutar mutCambiar.mutate
+                  return; // ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‹â€  evita ejecutar mutCambiar.mutate
                 }
 
-                // 👇 Resto de transiciones normales
+                // ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ¢â‚¬Â¡ Resto de transiciones normales
                 mutCambiar.mutate({ a, nota });
               }}
             >
@@ -598,7 +598,7 @@ export default function SolicitudShow() {
 
       {/* Items actuales */}
       <div className="card">
-        <div className="font-semibold text-lg mb-4 text-neutral-800 border-b pb-2">
+        <div className="font-semibold text-lg mb-4 text-slate-800 border-b pb-2">
           Items de la solicitud
         </div>
 
@@ -610,14 +610,14 @@ export default function SolicitudShow() {
               return (
                 <div
                   key={it.id}
-                  className={`rounded-2xl border border-neutral-200 bg-white shadow-sm hover:shadow-md transition-all duration-200 p-5 ${esEditable ? "ring-1 ring-rose-100" : ""
+                  className={`rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-all duration-200 p-5 ${esEditable ? "ring-1 ring-rose-100" : ""
                     }`}
                 >
                   {/* Encabezado */}
                   <div className="flex items-center justify-between mb-4">
                     {esEditable ? (
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-sm text-neutral-800">
+                        <span className="font-semibold text-sm text-slate-800">
                           {it.numero_parte}
                         </span>
                         <input
@@ -633,19 +633,19 @@ export default function SolicitudShow() {
                         />
                         {mutDescripcionItem.isLoading &&
                           mutDescripcionItem.variables?.itemId === it.id && (
-                            <span className="text-xs text-blue-600">Guardando…</span>
+                            <span className="text-xs text-blue-600">GuardandoÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</span>
                           )}
                       </div>
                     ) : (
-                      <div className="font-semibold text-sm text-neutral-800">
-                        {it.numero_parte} • {it.descripcion}
+                      <div className="font-semibold text-sm text-slate-800">
+                        {it.numero_parte} - {it.descripcion}
                       </div>
                     )}
 
-                    <div className="text-xs text-neutral-500 uppercase tracking-wide">
+                    <div className="text-xs text-slate-500 uppercase tracking-wide">
                       ESTADO:{" "}
-                      <span className="font-semibold text-neutral-700">
-                        {it.estado_pieza_code || "—"}
+                      <span className="font-semibold text-slate-700">
+                        {it.estado_pieza_code || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
                       </span>
                     </div>
                   </div>
@@ -654,7 +654,7 @@ export default function SolicitudShow() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Cantidad */}
                     <div className="flex flex-col gap-2 text-sm">
-                      <label className="text-xs text-neutral-500">Cantidad</label>
+                      <label className="text-xs text-slate-500">Cantidad</label>
                       <input
                         type="number"
                         className="input w-24"
@@ -668,9 +668,9 @@ export default function SolicitudShow() {
                           })
                         }
                       />
-                      <div className="flex justify-between text-xs text-neutral-600 mt-1">
+                      <div className="flex justify-between text-xs text-slate-600 mt-1">
                         <span>Unidad: {it.unidad}</span>
-                        <span className="font-semibold text-neutral-700">
+                        <span className="font-semibold text-slate-700">
                           Total: ${Number(it.costo_total || 0).toFixed(2)}
                         </span>
                       </div>
@@ -680,7 +680,7 @@ export default function SolicitudShow() {
                     <div className="flex flex-col gap-2 text-sm">
                       {esEditable ? (
                         <>
-                          <label className="text-xs text-neutral-500">
+                          <label className="text-xs text-slate-500">
                             Costo Unitario
                           </label>
                           <input
@@ -698,9 +698,9 @@ export default function SolicitudShow() {
                           />
                         </>
                       ) : (
-                        <div className="text-xs text-neutral-500 mt-4">
+                        <div className="text-xs text-slate-500 mt-4">
                           Costo:{" "}
-                          <span className="text-neutral-700 font-medium">
+                          <span className="text-slate-700 font-medium">
                             ${Number(it.costo_unitario || 0).toFixed(2)}
                           </span>
                         </div>
@@ -712,7 +712,7 @@ export default function SolicitudShow() {
                       <div className="flex flex-col gap-3 text-sm">
 
                         <div>
-                          <label className="text-xs text-neutral-500 mb-1 block">
+                          <label className="text-xs text-slate-500 mb-1 block">
                             Status de la pieza
                           </label>
                           <select
@@ -725,7 +725,7 @@ export default function SolicitudShow() {
                               })
                             }
                           >
-                            <option value="">Elige una opción</option>
+                            <option value="">Elige una opciÃƒÆ’Ã‚Â³n</option>
                             {ITEM_CLASIF_OPTS.map((op) => (
                               <option key={op} value={op}>{op}</option>
                             ))}
@@ -733,8 +733,8 @@ export default function SolicitudShow() {
                         </div>
 
                         <div>
-                          <label className="text-xs text-neutral-500 mb-1 block">
-                            Motivo de garantía
+                          <label className="text-xs text-slate-500 mb-1 block">
+                            Motivo de garantÃƒÆ’Ã‚Â­a
                           </label>
                           <select
                             className="input"
@@ -746,7 +746,7 @@ export default function SolicitudShow() {
                               })
                             }
                           >
-                            <option value="">Elige una opción</option>
+                            <option value="">Elige una opciÃƒÆ’Ã‚Â³n</option>
                             {MotivoGarantiaOptions.map((op) => (
                               <option key={op} value={op}>{op}</option>
                             ))}
@@ -758,14 +758,14 @@ export default function SolicitudShow() {
                   </div>
 
                   {/* Footer */}
-                  <div className="mt-4 flex justify-end items-center text-xs text-neutral-500 border-t border-neutral-200 pt-2">
+                  <div className="mt-4 flex justify-end items-center text-xs text-slate-500 border-t border-slate-200 pt-2">
                     {mutCantidadItem.isLoading &&
                       mutCantidadItem.variables?.itemId === it.id && (
-                        <span className="text-blue-600">Guardando cantidad…</span>
+                        <span className="text-blue-600">Guardando cantidadÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</span>
                       )}
                     {mutCostoItem.isLoading &&
                       mutCostoItem.variables?.itemId === it.id && (
-                        <span className="text-blue-600 ml-4">Guardando costo…</span>
+                        <span className="text-blue-600 ml-4">Guardando costoÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</span>
                       )}
                   </div>
                 </div>
@@ -773,7 +773,7 @@ export default function SolicitudShow() {
             })}
           </div>
         ) : (
-          <div className="text-sm text-neutral-400">Sin items.</div>
+          <div className="text-sm text-slate-400">Sin items.</div>
         )}
       </div>
 
@@ -782,10 +782,10 @@ export default function SolicitudShow() {
       <div className="card">
         <div className="font-semibold mb-2">Agregar item desde catálogo</div>
 
-        {/* Submenú: escoger máquina */}
+        {/* SubmenÃƒÆ’Ã‚Âº: escoger máquina */}
         <div className="flex flex-col md:flex-row gap-2 md:items-center mb-3">
           <div className="flex items-center gap-2">
-            {/* Submenú: escoger máquina (versión avatars) */}
+            {/* SubmenÃƒÆ’Ã‚Âº: escoger máquina (versiÃƒÆ’Ã‚Â³n avatars) */}
             <div className="flex flex-col gap-2 mb-3">
               <MachinePicker
                 value={machineKey}
@@ -808,7 +808,7 @@ export default function SolicitudShow() {
                 <div className="flex gap-2 items-center ml-auto">
                   <input
                     className="input"
-                    placeholder="Buscar por clave o descripción"
+                    placeholder="Buscar por clave o descripciÃƒÆ’Ã‚Â³n"
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     onKeyDown={async (e) => {
@@ -837,14 +837,14 @@ export default function SolicitudShow() {
               title="Ver detalles"
             >
               <div className="font-medium">
-                {p.clave_prod} • {p.desc_prod}
+                {p.clave_prod} - {p.desc_prod}
               </div>
-              <div className="text-sm text-neutral-400">
-                {p.uni_med} • Precio:{" "}
+              <div className="text-sm text-slate-400">
+                {p.uni_med} - Precio:{" "}
                 {MXN_FORMAT.format(
                   toMXN(p.precio_venta ?? 0, p.moneda_precio || "1")
                 )}{" "}
-                <span className="text-neutral-500">
+                <span className="text-slate-500">
                   (
                   {MONEDA_LABEL[p.moneda_precio || "1"] ?? "MXN"}{" "}
                   {Number(p.precio_venta ?? 0).toFixed(4)})
@@ -853,93 +853,93 @@ export default function SolicitudShow() {
             </div>
           ))}
           {!productos.length && (
-            <div className="text-sm text-neutral-500">Sin resultados.</div>
+            <div className="text-sm text-slate-500">Sin resultados.</div>
           )}
         </div>
       </div>
 
       {/* Bitácora */}
       <div className="card">
-        <div className="font-semibold mb-2 text-neutral-800">Bitácora</div>
+        <div className="font-semibold mb-2 text-slate-800">Bitácora</div>
         {s.bitacora?.length ? (
           s.bitacora.map((b) => (
             <div
               key={b.id}
-              className="text-sm text-neutral-700 py-2 border-b border-neutral-200 last:border-0"
+              className="text-sm text-slate-700 py-2 border-b border-slate-200 last:border-0"
             >
-              <span className="font-medium text-neutral-800">
+              <span className="font-medium text-slate-800">
                 {new Date(b.ts).toLocaleString()}
               </span>{" "}
-              • {b.accion}{" "}
+              - {b.accion}{" "}
               {b.de ? (
                 <span className="text-blue-700 font-medium">
-                  ({b.de} → {b.a})
+                  ({b.de} - {b.a})
                 </span>
               ) : null}{" "}
-              {b.nota ? `• ${b.nota}` : ""}{" "}
+              {b.nota ? `- ${b.nota}` : ""}{" "}
               {b.actor && (
-                <span className="text-neutral-500">• {b.actor}</span>
+                <span className="text-slate-500">- {b.actor}</span>
               )}
             </div>
           ))
         ) : (
-          <div className="text-sm text-neutral-500">Sin movimientos.</div>
+          <div className="text-sm text-slate-500">Sin movimientos.</div>
         )}
       </div>
 
-      {/* Modal: Clasificación antes de aprobar */}
-      {/* Modal: Clasificación antes de aprobar */}
+      {/* Modal: ClasificaciÃƒÆ’Ã‚Â³n antes de aprobar */}
+      {/* Modal: ClasificaciÃƒÆ’Ã‚Â³n antes de aprobar */}
       {clasifOpen && (
         <>
           {/* Backdrop con leve blur */}
           <div
-            className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-[1px]"
+            className="fixed inset-0 z-[100] bg-slate-900/30 backdrop-blur-[1px]"
             onClick={() => !savingClasif && setClasifOpen(false)}
           />
 
           {/* Panel */}
           <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="w-full sm:max-w-lg bg-white rounded-2xl shadow-2xl border border-neutral-200 overflow-hidden">
+            <div className="w-full sm:max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
               {/* Header */}
-              <div className="px-5 py-4 bg-neutral-50 border-b border-neutral-200 flex items-start justify-between">
+              <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-start justify-between">
                 <div>
-                  <div className="text-lg font-semibold text-neutral-900">Confirmación</div>
-                  <div className="text-sm text-neutral-600">Tip: recuerda verificar la gestión.</div>
+                  <div className="text-lg font-semibold text-slate-900">ConfirmaciÃƒÆ’Ã‚Â³n</div>
+                  <div className="text-sm text-slate-600">Tip: recuerda verificar la gestiÃƒÆ’Ã‚Â³n.</div>
                 </div>
                 <button
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-100"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
                   onClick={() => !savingClasif && setClasifOpen(false)}
                   aria-label="Cerrar"
                 >
-                  ×
+                  ÃƒÆ’Ã¢â‚¬â€
                 </button>
               </div>
 
               {/* Body */}
               <div className="px-5 py-4 space-y-4">
-                {/* Clasificación */}
+                {/* ClasificaciÃƒÆ’Ã‚Â³n */}
                 <div>
-                  <label className="text-sm font-medium text-neutral-800">Clasificación de garantía</label>
+                  <label className="text-sm font-medium text-slate-800">ClasificaciÃƒÆ’Ã‚Â³n de garantÃƒÆ’Ã‚Â­a</label>
                   <select
                     className="input mt-1 bg-white focus:ring-2 focus:ring-blue-600"
                     value={clasifValue}
                     onChange={(e) => setClasifValue(e.target.value)}
                     disabled={savingClasif}
                   >
-                    <option value="">Selecciona una opción…</option>
+                    <option value="">Selecciona una opciÃƒÆ’Ã‚Â³nÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</option>
                     {CLASIF_OPTIONS.map((op) => (
                       <option key={op} value={op}>{op}</option>
                     ))}
                   </select>
                   {!clasifValue && (
-                    <p className="mt-1 text-xs text-neutral-500">Selecciona una clasificación para continuar.</p>
+                    <p className="mt-1 text-xs text-slate-500">Selecciona una clasificaciÃƒÆ’Ã‚Â³n para continuar.</p>
                   )}
                 </div>
 
                 {/* Folio SAI */}
                 <div>
-                  <label className="text-sm font-medium text-neutral-800">
-                    Folio SAI <span className="text-neutral-400 font-normal">(opcional)</span>
+                  <label className="text-sm font-medium text-slate-800">
+                    Folio SAI <span className="text-slate-400 font-normal">(opcional)</span>
                   </label>
                   <input
                     className="input mt-1 bg-white focus:ring-2 focus:ring-blue-600"
@@ -953,8 +953,8 @@ export default function SolicitudShow() {
 
                 {/* Medio de entrega (opcional) */}
                 <div>
-                  <label className="text-sm font-medium text-neutral-800">
-                    Elige el medio de entrega <span className="text-neutral-400 font-normal">(opcional)</span>
+                  <label className="text-sm font-medium text-slate-800">
+                    Elige el medio de entrega <span className="text-slate-400 font-normal">(opcional)</span>
                   </label>
                   <select
                     className="input mt-1 bg-white focus:ring-2 focus:ring-blue-600"
@@ -962,7 +962,7 @@ export default function SolicitudShow() {
                     onChange={(e) => setMedioEntregaValue(e.target.value)}
                     disabled={savingClasif}
                   >
-                    <option value="">Elige una opción</option>
+                    <option value="">Elige una opciÃƒÆ’Ã‚Â³n</option>
                     {MEDIO_ENTREGA_OPTIONS.map((op) => (
                       <option key={op} value={op}>{op}</option>
                     ))}
@@ -971,7 +971,7 @@ export default function SolicitudShow() {
               </div>
 
               {/* Footer */}
-              <div className="px-5 py-4 bg-neutral-50 border-t border-neutral-200 flex justify-end gap-2">
+              <div className="px-5 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
                 <button
                   className="btn"
                   onClick={() => !savingClasif && setClasifOpen(false)}
@@ -1005,7 +1005,7 @@ export default function SolicitudShow() {
                     }
                   }}
                 >
-                  {savingClasif ? "Guardando…" : "Aprobar"}
+                  {savingClasif ? "GuardandoÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦" : "Aprobar"}
                 </button>
               </div>
             </div>
@@ -1033,9 +1033,9 @@ export default function SolicitudShow() {
         canAdd={true}
       />
       {showSuccessModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-[90%] sm:w-[420px] text-center border border-neutral-200 relative">
-            {/* Icono de éxito */}
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-[90%] sm:w-[420px] text-center border border-slate-200 relative">
+            {/* Icono de ÃƒÆ’Ã‚Â©xito */}
             <div className="flex justify-center mb-4">
               <div className="flex items-center justify-center w-14 h-14 rounded-full bg-green-100 animate-scale-in">
                 <svg
@@ -1053,22 +1053,22 @@ export default function SolicitudShow() {
               </div>
             </div>
 
-            {/* Título y mensaje */}
+            {/* TÃƒÆ’Ã‚Â­tulo y mensaje */}
             <h2 className="text-xl font-semibold text-green-700 mb-1">Comentario agregado</h2>
-            <p className="text-sm text-neutral-600 mb-6">
-              El comentario se publicó correctamente en Zoho.
+            <p className="text-sm text-slate-600 mb-6">
+              El comentario se publicÃƒÆ’Ã‚Â³ correctamente en Zoho.
             </p>
 
-            {/* Botón */}
+            {/* BotÃƒÆ’Ã‚Â³n */}
             <button
               onClick={() => setShowSuccessModal(false)}
-              className="w-full py-2.5 rounded-xl bg-black text-white font-medium hover:bg-neutral-800 transition-all duration-200 shadow-sm"
+              className="w-full py-2.5 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 transition-all duration-200 shadow-sm"
             >
               Aceptar
             </button>
           </div>
 
-          {/* Animación sencilla */}
+          {/* AnimaciÃƒÆ’Ã‚Â³n sencilla */}
           <style>
             {`
         @keyframes scaleIn {
@@ -1083,18 +1083,18 @@ export default function SolicitudShow() {
         </div>
       )}
       {showTecnicoModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/30">
           <div className="bg-white rounded-xl p-6 w-[90%] sm:w-[400px] shadow-xl">
 
-            <h2 className="text-lg font-semibold mb-3">¿Qué técnico atendió?</h2>
+            <h2 className="text-lg font-semibold mb-3">Ãƒâ€šÃ‚Â¿QuÃƒÆ’Ã‚Â© tÃƒÆ’Ã‚Â©cnico atendiÃƒÆ’Ã‚Â³?</h2>
 
             <select
               className="input w-full"
               value={tecnicoAsignado}
               onChange={(e) => setTecnicoAsignado(e.target.value)}
             >
-              <option value="">Selecciona…</option>
-              {/* Opción extra */}
+              <option value="">SeleccionaÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</option>
+              {/* OpciÃƒÆ’Ã‚Â³n extra */}
               <option value="Cliente Instala">Cliente Instala</option>
               {tecnicos.map((t) => (
                 <option key={t.id} value={t.nombre_tecnico}>
@@ -1113,18 +1113,18 @@ export default function SolicitudShow() {
                 disabled={!tecnicoAsignado}
                 onClick={async () => {
                   try {
-                    // 1. Guardar técnico en la solicitud
+                    // 1. Guardar tÃƒÆ’Ã‚Â©cnico en la solicitud
                     await setTecnicoSolicitud(id, tecnicoAsignado);
 
                     // 2. Cambiar estatus a LIBERADA
                     await mutCambiar.mutateAsync({
                       a: "LIBERADA",
-                      nota: `Técnico que atendió: ${tecnicoAsignado}`
+                      nota: `TÃƒÆ’Ã‚Â©cnico que atendiÃƒÆ’Ã‚Â³: ${tecnicoAsignado}`
                     });
 
                     setShowTecnicoModal(false);
                   } catch (err) {
-                    alert("Error guardando técnico" + err);
+                    alert("Error guardando tÃƒÆ’Ã‚Â©cnico" + err);
                   }
                 }}
               >
@@ -1160,24 +1160,24 @@ function PiezaDrawer({
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 bg-black/40 transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        className={`fixed inset-0 bg-slate-900/30 transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
           }`}
         onClick={onClose}
       />
       {/* Panel */}
       <aside
-        className={`fixed inset-y-0 right-0 w-full sm:w-[500px] bg-white text-neutral-900 shadow-2xl border-l border-neutral-200 transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"
+        className={`fixed inset-y-0 right-0 w-full sm:w-[500px] bg-white text-slate-900 shadow-2xl border-l border-slate-200 transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"
           }`}
         aria-hidden={!open}
       >
         <div className="h-full flex flex-col">
           {/* Header */}
-          <div className="p-4 border-b border-neutral-200 flex items-center justify-between bg-white">
+          <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-white">
             <div>
-              <div className="text-sm font-semibold text-neutral-800">
-                {pieza?.clave_prod || "—"}
+              <div className="text-sm font-semibold text-slate-800">
+                {pieza?.clave_prod || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
               </div>
-              <div className="text-xs text-neutral-500">
+              <div className="text-xs text-slate-500">
                 {pieza?.desc_prod || ""}
               </div>
             </div>
@@ -1187,9 +1187,9 @@ function PiezaDrawer({
           {/* Body */}
           <div className="p-4 overflow-auto space-y-4">
             {loading ? (
-              <div className="w-full h-60 bg-neutral-200 animate-pulse rounded-xl" />
+              <div className="w-full h-60 bg-slate-200 animate-pulse rounded-xl" />
             ) : (
-              <div className="rounded-xl overflow-hidden border border-neutral-200 bg-neutral-50">
+              <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
                 <img
                   src={pieza?.link_img || PLACEHOLDER}
                   alt={pieza?.desc_prod}
@@ -1202,11 +1202,11 @@ function PiezaDrawer({
             <div className="grid grid-cols-2 gap-2 text-sm">
               {loading ? (
                 <>
-                  <div className="h-16 bg-neutral-200 animate-pulse rounded-lg" />
-                  <div className="h-16 bg-neutral-200 animate-pulse rounded-lg" />
-                  <div className="h-16 bg-neutral-200 animate-pulse rounded-lg" />
-                  <div className="h-16 bg-neutral-200 animate-pulse rounded-lg" />
-                  <div className="h-20 bg-neutral-200 animate-pulse rounded-lg col-span-2" />
+                  <div className="h-16 bg-slate-200 animate-pulse rounded-lg" />
+                  <div className="h-16 bg-slate-200 animate-pulse rounded-lg" />
+                  <div className="h-16 bg-slate-200 animate-pulse rounded-lg" />
+                  <div className="h-16 bg-slate-200 animate-pulse rounded-lg" />
+                  <div className="h-20 bg-slate-200 animate-pulse rounded-lg col-span-2" />
                 </>
               ) : (
                 <>
@@ -1217,7 +1217,7 @@ function PiezaDrawer({
                     value={
                       pieza?.costo_entrante != null
                         ? MXN_FORMAT.format(costoMXN)
-                        : "—"
+                        : "-"
                     }
                   />
 
@@ -1226,7 +1226,7 @@ function PiezaDrawer({
                     value={
                       pieza?.costo_entrante != null
                         ? `$${Number(pieza.costo_entrante).toFixed(2)} ${MONEDA_LABEL[costoCur] || "MXN"}`
-                        : "—"
+                        : "-"
                     }
                   />
                   <div className="col-span-2">
@@ -1237,14 +1237,14 @@ function PiezaDrawer({
             </div>
 
             {loading ? (
-              <div className="p-3 rounded-lg border border-neutral-200 bg-neutral-50">
-                <div className="h-10 bg-neutral-200 animate-pulse rounded-lg" />
+              <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
+                <div className="h-10 bg-slate-200 animate-pulse rounded-lg" />
               </div>
             ) : (
               <>
                 {/* Cantidad + total + agregar */}
-                <div className="p-3 rounded-lg border border-neutral-200 bg-neutral-50">
-                  <div className="text-[11px] uppercase tracking-wide text-neutral-500 mb-2">
+                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
+                  <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">
                     Cantidad
                   </div>
                   <div className="flex items-center gap-2">
@@ -1259,7 +1259,7 @@ function PiezaDrawer({
                       disabled={!pieza}
                       title="Menos"
                     >
-                      −
+                      -
                     </button>
 
                     <input
@@ -1288,7 +1288,7 @@ function PiezaDrawer({
                     <div className="ml-auto text-sm">
                       Total:{" "}
                       <span className="font-semibold">
-                        {qtyValid ? MXN_FORMAT.format(totalPreviewMXN) : "—"}
+                        {qtyValid ? MXN_FORMAT.format(totalPreviewMXN) : "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
                       </span>
                     </div>
 
@@ -1298,7 +1298,7 @@ function PiezaDrawer({
                       onClick={onAdd}
                       title={
                         !canAdd
-                          ? "No es posible agregar piezas mientras la solicitud está en revisión"
+                          ? "No es posible agregar piezas mientras la solicitud está en revisiÃƒÆ’Ã‚Â³n"
                           : !pieza
                             ? "Selecciona un producto"
                             : !qtyValid
@@ -1321,12 +1321,12 @@ function PiezaDrawer({
 
 function Spec({ label, value }) {
   return (
-    <div className="p-3 rounded-lg border border-neutral-200 bg-white text-neutral-800">
-      <div className="text-[11px] uppercase tracking-wide text-neutral-500">
+    <div className="p-3 rounded-lg border border-slate-200 bg-white text-slate-800">
+      <div className="text-[11px] uppercase tracking-wide text-slate-500">
         {label}
       </div>
       <div className="text-sm font-medium break-words">
-        {value || "—"}
+        {value || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
       </div>
     </div>
   );
@@ -1355,7 +1355,7 @@ function MachinePicker({ value, onChange, onShowParts }) {
                 className={`w-16 h-16 rounded-full border-2 transition-all duration-200 flex items-center justify-center
                 ${active
                     ? "border-blue-500 ring-4 ring-blue-500/40 bg-blue-50 scale-105"
-                    : "border-neutral-300 bg-neutral-100 group-hover:border-neutral-400"
+                    : "border-slate-300 bg-slate-100 group-hover:border-slate-400"
                   }`}
               >
                 <img
@@ -1372,7 +1372,7 @@ function MachinePicker({ value, onChange, onShowParts }) {
                 className={`mt-2 text-[12px] w-20 text-center leading-tight transition-colors duration-200
                 ${active
                     ? "text-blue-600 font-semibold"
-                    : "text-neutral-600 group-hover:text-neutral-800"
+                    : "text-slate-600 group-hover:text-slate-800"
                   }`}
               >
                 {label}
@@ -1384,7 +1384,7 @@ function MachinePicker({ value, onChange, onShowParts }) {
         <button
           type="button"
           onClick={onShowParts}
-          className="ml-2 self-center px-3 py-2 rounded-full border border-neutral-300 text-sm text-neutral-700 hover:bg-neutral-100 cursor-pointer"
+          className="ml-2 self-center px-3 py-2 rounded-full border border-slate-300 text-sm text-slate-700 hover:bg-slate-100 cursor-pointer"
           title="Ver piezas sugeridas"
         >
           Ver piezas
