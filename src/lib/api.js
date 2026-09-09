@@ -175,6 +175,8 @@ export const resetPinUsuarioAlmacen = async (id, nuevo_pin) =>
 export const validarPinUsuario = async (pin) =>
   (await api.post("/almacen/usuarios_almacen/validar_pin", { pin })).data;
 
+
+
 //FUERA DE LA API12
 // POST: agregar comentario (HTML) a ticket de Zoho vía tu backend
 export const addZohoComment = async ({ ticketId, message, isPublic = true }) => {

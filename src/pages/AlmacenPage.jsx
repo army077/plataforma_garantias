@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     listAlmacenMovimientos,
     createAlmacenMovimiento,
@@ -19,6 +19,18 @@ import { useNavigate } from "react-router-dom";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 
+// Normaliza "OP3889", "op3889" o "3889" a la forma pura "3889" para comparar OPs
+function normalizarOP(value) {
+    if (!value) return "";
+    return String(value).trim().replace(/^OP/i, "").trim();
+}
+
+// Formatea cualquier valor de OP para mostrarse siempre con el prefijo "OP" (ej. "OP3889")
+function formatearOP(value) {
+    const norm = normalizarOP(value);
+    return norm ? `OP${norm}` : "";
+}
+
 export default function AlmacenPage() {
     const { user, role, usuarioId } = useAuth();
     const navigate = useNavigate();
@@ -37,6 +49,14 @@ export default function AlmacenPage() {
 
     const [ordenesUnicas, setOrdenesUnicas] = useState([]);
     const [filtroOrden, setFiltroOrden] = useState("");
+
+    // Filtro por estado de movimiento (chips); "" significa "Todos"
+    const [filtroMovimiento, setFiltroMovimiento] = useState("");
+
+    // Buscador/combobox de OP: texto visible y estado de sugerencias (no es la fuente de verdad del filtro)
+    const [opSearchText, setOpSearchText] = useState("");
+    const [mostrarSugerenciasOP, setMostrarSugerenciasOP] = useState(false);
+    const [indiceSugerenciaActiva, setIndiceSugerenciaActiva] = useState(-1);
 
     const [pinModalOpen, setPinModalOpen] = useState(false);
     const [pinValue, setPinValue] = useState("");
@@ -276,9 +296,91 @@ export default function AlmacenPage() {
         });
     };
 
-    const filtrados = rows.filter((r) =>
-        filtroOrden === "" ? true : r.orden_produccion === filtroOrden
-    );
+    // Mantener el texto visible del buscador sincronizado con la fuente de verdad del filtro
+    useEffect(() => {
+        setOpSearchText(filtroOrden ? formatearOP(filtroOrden) : "");
+    }, [filtroOrden]);
+
+    // Sugerencias limitadas, solo a partir de las OP ya cargadas en los movimientos y con texto de búsqueda
+    const sugerenciasOP = useMemo(() => {
+        const norm = normalizarOP(opSearchText);
+        if (!norm) return [];
+        return ordenesUnicas
+            .filter((op) => normalizarOP(op).includes(norm))
+            .slice(0, 8);
+    }, [ordenesUnicas, opSearchText]);
+
+    const aplicarFiltroOP = (valorCrudo) => {
+        const norm = normalizarOP(valorCrudo);
+        if (!norm) {
+            setFiltroOrden("");
+        } else {
+            // Preferir el valor tal como está almacenado en ordenesUnicas, si existe
+            const match = ordenesUnicas.find((op) => normalizarOP(op) === norm);
+            setFiltroOrden(match || norm);
+        }
+        setMostrarSugerenciasOP(false);
+        setIndiceSugerenciaActiva(-1);
+        setPage(1);
+    };
+
+    const limpiarFiltroOP = () => {
+        setFiltroOrden("");
+        setMostrarSugerenciasOP(false);
+        setIndiceSugerenciaActiva(-1);
+        setPage(1);
+    };
+
+    // Chips de MOVIMIENTO: solo cambian filtroMovimiento, nunca filtroOrden
+    const aplicarFiltroMovimiento = (valor) => {
+        setFiltroMovimiento(valor);
+        setPage(1);
+    };
+
+    // Clases del semáforo visual del select de Movimiento (solo presentación)
+    const getMovimientoClasses = (estatus) => {
+        switch (estatus) {
+            case "SIN ENTREGAR":
+                return "bg-red-50 text-red-800 border-red-300";
+            case "ENTREGADO":
+                return "bg-amber-50 text-amber-800 border-amber-300";
+            case "CARGADO":
+                return "bg-emerald-50 text-emerald-800 border-emerald-300";
+            default:
+                return "bg-white text-slate-700 border-slate-300";
+        }
+    };
+
+    const handleOpSearchKeyDown = (e) => {
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            if (sugerenciasOP.length === 0) return;
+            setMostrarSugerenciasOP(true);
+            setIndiceSugerenciaActiva((prev) => (prev + 1) % sugerenciasOP.length);
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            if (sugerenciasOP.length === 0) return;
+            setMostrarSugerenciasOP(true);
+            setIndiceSugerenciaActiva((prev) => (prev - 1 + sugerenciasOP.length) % sugerenciasOP.length);
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            if (mostrarSugerenciasOP && indiceSugerenciaActiva >= 0 && sugerenciasOP[indiceSugerenciaActiva]) {
+                aplicarFiltroOP(sugerenciasOP[indiceSugerenciaActiva]);
+            } else {
+                aplicarFiltroOP(opSearchText);
+            }
+        } else if (e.key === "Escape") {
+            e.preventDefault();
+            setMostrarSugerenciasOP(false);
+            setIndiceSugerenciaActiva(-1);
+        }
+    };
+
+    const filtrados = rows.filter((r) => {
+        const matchOrden = filtroOrden === "" ? true : r.orden_produccion === filtroOrden;
+        const matchMovimiento = filtroMovimiento === "" ? true : r.estatus_movimiento === filtroMovimiento;
+        return matchOrden && matchMovimiento;
+    });
 
     const totalPages = Math.ceil(filtrados.length / pageSize);
     const paginated = filtrados.slice((page - 1) * pageSize, page * pageSize);
@@ -303,18 +405,118 @@ export default function AlmacenPage() {
                         </button>
                     )}
 
-                    <select
-                        className="input w-auto"
-                        value={filtroOrden}
-                        onChange={(e) => setFiltroOrden(e.target.value)}
-                    >
-                        <option value="">Todas las órdenes</option>
-                        {ordenesUnicas.map((op) => (
-                            <option key={op} value={op}>
-                                {op}
-                            </option>
-                        ))}
-                    </select>
+                    <div className="relative w-56">
+                        <label htmlFor="op-search-input" className="sr-only">
+                            Buscar o escanear OP
+                        </label>
+                        <div className="relative">
+                            <input
+                                id="op-search-input"
+                                type="text"
+                                role="combobox"
+                                aria-expanded={mostrarSugerenciasOP && sugerenciasOP.length > 0}
+                                aria-controls="op-search-listbox"
+                                aria-autocomplete="list"
+                                autoComplete="off"
+                                autoFocus
+                                className="input w-full pr-8"
+                                placeholder="Buscar o escanear OP"
+                                value={opSearchText}
+                                onChange={(e) => {
+                                    setOpSearchText(e.target.value);
+                                    setMostrarSugerenciasOP(true);
+                                    setIndiceSugerenciaActiva(-1);
+                                }}
+                                onFocus={() => {
+                                    if (opSearchText.trim() !== "") setMostrarSugerenciasOP(true);
+                                }}
+                                onBlur={() => {
+                                    setTimeout(() => setMostrarSugerenciasOP(false), 100);
+                                }}
+                                onKeyDown={handleOpSearchKeyDown}
+                            />
+                            {(opSearchText || filtroOrden) && (
+                                <button
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={limpiarFiltroOP}
+                                    className="absolute inset-y-0 right-2 flex items-center text-slate-400 hover:text-slate-700"
+                                    title="Limpiar búsqueda de OP"
+                                    aria-label="Limpiar búsqueda de OP"
+                                >
+                                    ×
+                                </button>
+                            )}
+                        </div>
+
+                        {mostrarSugerenciasOP && sugerenciasOP.length > 0 && (
+                            <ul
+                                id="op-search-listbox"
+                                role="listbox"
+                                className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg text-sm"
+                            >
+                                {sugerenciasOP.map((op, idx) => (
+                                    <li
+                                        key={op}
+                                        role="option"
+                                        aria-selected={idx === indiceSugerenciaActiva}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => aplicarFiltroOP(op)}
+                                        className={`px-3 py-2 cursor-pointer ${
+                                            idx === indiceSugerenciaActiva
+                                                ? "bg-blue-50 text-blue-700"
+                                                : "hover:bg-slate-50 text-slate-700"
+                                        }`}
+                                    >
+                                        {formatearOP(op)}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Filtrar por movimiento">
+                        <button
+                            type="button"
+                            onClick={() => aplicarFiltroMovimiento("")}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${filtroMovimiento === ""
+                                ? "bg-slate-900 text-white border-slate-900"
+                                : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                                }`}
+                        >
+                            Todos
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => aplicarFiltroMovimiento("SIN ENTREGAR")}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${filtroMovimiento === "SIN ENTREGAR"
+                                ? "bg-red-600 text-white border-red-600"
+                                : "bg-red-50 text-red-700 border-red-300 hover:bg-red-100"
+                                }`}
+                        >
+                            🔴 Sin entregar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => aplicarFiltroMovimiento("ENTREGADO")}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${filtroMovimiento === "ENTREGADO"
+                                ? "bg-amber-500 text-white border-amber-500"
+                                : "bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100"
+                                }`}
+                        >
+                            🟡 Entregado
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => aplicarFiltroMovimiento("CARGADO")}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${filtroMovimiento === "CARGADO"
+                                ? "bg-emerald-600 text-white border-emerald-600"
+                                : "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100"
+                                }`}
+                        >
+                            🟢 Cargado (SAI)
+                        </button>
+                    </div>
 
                     <button
                         className="btn btn-primary"
@@ -410,7 +612,7 @@ export default function AlmacenPage() {
                                     <td className="px-6 py-4">
                                         {(role === "admin" || role === "almacen") && (
                                             <select
-                                                className="border rounded-lg px-2 py-1 text-xs bg-white"
+                                                className={`border rounded-lg px-2 py-1 text-xs font-semibold ${getMovimientoClasses(r.estatus_movimiento)}`}
                                                 value={r.estatus_movimiento}
                                                 onChange={(e) => {
                                                     e.stopPropagation();

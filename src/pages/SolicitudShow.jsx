@@ -20,9 +20,9 @@ import Loader from "../components/Loader.jsx";
 import { CircularProgress } from "@mui/material";
 import { useAuth } from "../auth/AuthProvider.jsx";
 
-/*----------------------- Motivos de garantÃƒÆ’Ã‚Â­a ----------------------- */
+/*----------------------- Motivos de garantía ----------------------- */
 
-const MotivoGarantiaOptions = ['Funcional', 'Descuido tÃƒÆ’Ã‚Â©cnico', 'RefacciÃƒÆ’Ã‚Â³n incorrecta', 'Faltante', 'Otro motivo'];
+const MotivoGarantiaOptions = ['Funcional', 'Descuido técnico', 'Refacción incorrecta', 'Faltante', 'Otro motivo'];
 
 /* ----------------------- Estados permitidos ----------------------- */
 const transiciones = {
@@ -34,7 +34,7 @@ const transiciones = {
   CERRADA: ["COMENTARIO ZOHO"],
 };
 
-/* ----------------------- ConversiÃƒÆ’Ã‚Â³n y etiquetas ----------------------- */
+/* ----------------------- Conversión y etiquetas ----------------------- */
 const MXN_FORMAT = new Intl.NumberFormat("es-MX", {
   style: "currency",
   currency: "MXN",
@@ -50,19 +50,19 @@ const MONEDA_LABEL = {
 
 // opciones del combo
 const CLASIF_OPTIONS = [
-  "InstalaciÃƒÆ’Ã‚Â³n",
-  "GarantÃƒÆ’Ã‚Â­a de Equipo",
-  "GarantÃƒÆ’Ã‚Â­a de Componente/ Servicio",
-  "CortesÃƒÆ’Ã‚Â­a",
+  "Instalación",
+  "Garantía de Equipo",
+  "Garantía de Componente / Servicio",
+  "Cortesía",
   "Marketing"
 ];
 
 const MEDIO_ENTREGA_OPTIONS = [
   "Entrega en sucursal",
-  "EnvÃƒÆ’Ã‚Â­o por Uber",
-  "PaqueterÃƒÆ’Ã‚Â­a a domicilio del cliente",
-  "PaqueterÃƒÆ’Ã‚Â­a ocurre o central",
-  "EnvÃƒÆ’Ã‚Â­o por grÃƒÆ’Ã‚Âºa interna",
+  "Envío por Uber",
+  "Paquetería a domicilio del cliente",
+  "Paquetería ocurre o central",
+  "Envío por grúa interna",
 ];
 
 
@@ -157,7 +157,7 @@ const MACHINE_META = {
   SAAP: { label: "SAAP", img: "/img/saap.png" },
 };
 
-/* Etiquetas ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œbonitasÃƒÂ¢Ã¢â€šÂ¬Ã‚Â para el dropdown */
+/* Etiquetas "bonitas" para el dropdown */
 const MACHINE_LABEL = {
   MAKER0609: "Maker",
   BENDWORX: "Bend Worx",
@@ -172,11 +172,11 @@ const MACHINE_LABEL = {
 
 const ITEM_CLASIF_OPTS = [
   "Pieza sin Seguimiento",
-  "Utilizada y con tÃƒÆ’Ã‚Â©cnico",
-  "No utilizada y con tÃƒÆ’Ã‚Â©cnico",
-  "En almacÃƒÆ’Ã‚Â©n AR",
+  "Utilizada y con técnico",
+  "No utilizada y con técnico",
+  "En almacén AR",
   "Con el Cliente",
-  "Utilizada y con GarantÃƒÆ’Ã‚Â­as",
+  "Utilizada y con Garantías",
   "Utilizada y en CDMX",
   "Utilizada y en MTY",
   "Utilizada y en Ocotlán",
@@ -206,7 +206,7 @@ function buildEntregaHTML(solicitud) {
   return `
   <div style="font-family: ui-sans-serif, system-ui, Segoe UI, Roboto, Arial; color:#0f172a;">
     <div style="padding:16px; border-radius:12px; background:#f3f4f6; border:1px solid #d1d5db;">
-      <h2 style="margin:0 0 6px; font-size:18px;">Orden de Trabajo entregada ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦</h2>
+      <h2 style="margin:0 0 6px; font-size:18px;">Orden de Trabajo entregada ✅</h2>
       <div style="font-size:12px; color:#475569; margin-bottom:10px;">Estatus: <strong>PIEZAS ENTREGADAS</strong>.</div>
 
       <table style="width:100%; border-collapse:separate; border-spacing:0 8px; font-size:13px;">
@@ -215,7 +215,7 @@ function buildEntregaHTML(solicitud) {
           <td style="font-weight:600;">Nohemi Amaya</td>
         </tr>
         <tr>
-          <td style="color:#64748b;">ClasificaciÃƒÆ’Ã‚Â³n de GarantÃƒÆ’Ã‚Â­a:</td>
+          <td style="color:#64748b;">Clasificación de Garantía:</td>
           <td>${solicitud.clasificacion_garantia || "-"}</td>
         </tr>
         <tr>
@@ -228,8 +228,8 @@ function buildEntregaHTML(solicitud) {
       <table style="width:100%; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; font-size:13px;">
         <thead>
           <tr style="background:#ef4444; color:white;">
-            <th style="text-align:left; padding:8px 10px; width:120px;">NÃƒÆ’Ã‚Âºmero</th>
-            <th style="text-align:left; padding:8px 10px;">DescripciÃƒÆ’Ã‚Â³n</th>
+            <th style="text-align:left; padding:8px 10px; width:120px;">Número</th>
+            <th style="text-align:left; padding:8px 10px;">Descripción</th>
             <th style="text-align:right; padding:8px 10px; width:140px;">Cantidad</th>
             <th style="text-align:right; padding:8px 10px; width:140px;">Precio total</th>
           </tr>
@@ -248,7 +248,7 @@ function buildEntregaHTML(solicitud) {
       </style>
 
       <div style="margin-top:12px; font-size:12px; color:#64748b;">
-        Generado automáticamente por la plataforma de garantÃƒÆ’Ã‚Â­as.
+        Generado automáticamente por la plataforma de garantías.
       </div>
     </div>
   </div>`;
@@ -279,7 +279,7 @@ export default function SolicitudShow() {
 
   const [nota, setNota] = useState("");
 
-  // BÃƒÆ’Ã‚Âºsqueda normal por texto
+  // Búsqueda normal por texto
   const [q, setQ] = useState("");
   const [productos, setProductos] = useState([]);
 
@@ -293,7 +293,7 @@ export default function SolicitudShow() {
     setCantidad(1);
   }, [selected?.id]);
 
-  // SubmenÃƒÆ’Ã‚Âº de máquinas
+  // Submenú de máquinas
   const [machineKey, setMachineKey] = useState("");
   const [partsLoading, setPartsLoading] = useState(false);
 
@@ -353,7 +353,7 @@ export default function SolicitudShow() {
     mutationFn: ({ itemId, descripcion }) =>
       setDescripcionItem(id, itemId, { descripcion }),
     onSuccess: () => queryClient.invalidateQueries(["solicitud", id]),
-    onError: (e) => alert("Error al guardar descripciÃƒÆ’Ã‚Â³n: " + e.message),
+    onError: (e) => alert("Error al guardar descripción: " + e.message),
   });
 
   const mutCerrar = useMutation({
@@ -377,7 +377,7 @@ export default function SolicitudShow() {
   const costoMXN = toMXN(costo, costoCur);
   const totalPreviewMXN = selected && qtyValid ? qtyNum * costoMXN : 0;
 
-  // Modal clasificaciÃƒÆ’Ã‚Â³n para aprobar
+  // Modal clasificación para aprobar
   const [clasifOpen, setClasifOpen] = useState(false);
   const [clasifValue, setClasifValue] = useState("");
   const [savingClasif, setSavingClasif] = useState(false);
@@ -447,7 +447,7 @@ export default function SolicitudShow() {
 
     setPartsLoading(true);
     try {
-      // Buscar por cada clave. Si tu backend soporta mÃƒÆ’Ã‚Âºltiple, reemplaza por un endpoint decente.
+      // Buscar por cada clave. Si tu backend soporta múltiple, reemplaza por un endpoint decente.
       const results = await Promise.all(
         claves.map(async (clave) => {
           try {
@@ -542,7 +542,7 @@ export default function SolicitudShow() {
                 : "btn-primary"
                 }`}
               onClick={async () => {
-                // ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ¢â‚¬Â¡ Caso especial: APROBADA desde EN_REVISION
+                // 👉 Caso especial: APROBADA desde EN_REVISION
                 if (a === "APROBADA" && s?.estado_code === "EN_REVISION") {
                   setClasifOpen(true);
                   return;
@@ -559,11 +559,11 @@ export default function SolicitudShow() {
                   await mutCerrar.mutateAsync(hoy);   // <--- tu API para fecha_salida
                 }
 
-                // ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ¢â‚¬Â¡ Caso especial: COMENTARIO ZOHO ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ agrega comentario, no cambia estado
+                // 👉 Caso especial: COMENTARIO ZOHO → agrega comentario, no cambia estado
                 if (a === "COMENTARIO ZOHO") {
                   const ticketId = s?.ticket_id_externo;
                   if (!ticketId) {
-                    console.warn("ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â No se encontrÃƒÆ’Ã‚Â³ ticket_id_externo");
+                    console.warn("⚠️ No se encontró ticket_id_externo");
                     return;
                   }
 
@@ -571,18 +571,18 @@ export default function SolicitudShow() {
                   try {
                     const html = buildEntregaHTML(s);
                     await addZohoComment({ ticketId, message: html, isPublic: true });
-                    console.log("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Comentario agregado manualmente a Zoho");
-                    setShowSuccessModal(true); // ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‹â€  muestra modal
+                    console.log("✅ Comentario agregado manualmente a Zoho");
+                    setShowSuccessModal(true); // 👆 muestra modal
                   } catch (err) {
-                    console.error("ÃƒÂ¢Ã‚ÂÃ…â€™ Error al enviar comentario a Zoho:", err);
+                    console.error("❌ Error al enviar comentario a Zoho:", err);
                     alert("Error al enviar comentario a Zoho");
                   } finally {
                     setLoadingZoho(false);
                   }
-                  return; // ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‹â€  evita ejecutar mutCambiar.mutate
+                  return; // 👆 evita ejecutar mutCambiar.mutate
                 }
 
-                // ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ¢â‚¬Â¡ Resto de transiciones normales
+                // 👉 Resto de transiciones normales
                 mutCambiar.mutate({ a, nota });
               }}
             >
@@ -633,7 +633,7 @@ export default function SolicitudShow() {
                         />
                         {mutDescripcionItem.isLoading &&
                           mutDescripcionItem.variables?.itemId === it.id && (
-                            <span className="text-xs text-blue-600">GuardandoÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</span>
+                            <span className="text-xs text-blue-600">Guardando…</span>
                           )}
                       </div>
                     ) : (
@@ -645,7 +645,7 @@ export default function SolicitudShow() {
                     <div className="text-xs text-slate-500 uppercase tracking-wide">
                       ESTADO:{" "}
                       <span className="font-semibold text-slate-700">
-                        {it.estado_pieza_code || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                        {it.estado_pieza_code || "—"}
                       </span>
                     </div>
                   </div>
@@ -725,7 +725,7 @@ export default function SolicitudShow() {
                               })
                             }
                           >
-                            <option value="">Elige una opciÃƒÆ’Ã‚Â³n</option>
+                            <option value="">Elige una opción</option>
                             {ITEM_CLASIF_OPTS.map((op) => (
                               <option key={op} value={op}>{op}</option>
                             ))}
@@ -734,7 +734,7 @@ export default function SolicitudShow() {
 
                         <div>
                           <label className="text-xs text-slate-500 mb-1 block">
-                            Motivo de garantÃƒÆ’Ã‚Â­a
+                            Motivo de garantía
                           </label>
                           <select
                             className="input"
@@ -746,7 +746,7 @@ export default function SolicitudShow() {
                               })
                             }
                           >
-                            <option value="">Elige una opciÃƒÆ’Ã‚Â³n</option>
+                            <option value="">Elige una opción</option>
                             {MotivoGarantiaOptions.map((op) => (
                               <option key={op} value={op}>{op}</option>
                             ))}
@@ -761,11 +761,11 @@ export default function SolicitudShow() {
                   <div className="mt-4 flex justify-end items-center text-xs text-slate-500 border-t border-slate-200 pt-2">
                     {mutCantidadItem.isLoading &&
                       mutCantidadItem.variables?.itemId === it.id && (
-                        <span className="text-blue-600">Guardando cantidadÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</span>
+                        <span className="text-blue-600">Guardando cantidad…</span>
                       )}
                     {mutCostoItem.isLoading &&
                       mutCostoItem.variables?.itemId === it.id && (
-                        <span className="text-blue-600 ml-4">Guardando costoÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</span>
+                        <span className="text-blue-600 ml-4">Guardando costo…</span>
                       )}
                   </div>
                 </div>
@@ -782,10 +782,10 @@ export default function SolicitudShow() {
       <div className="card">
         <div className="font-semibold mb-2">Agregar item desde catálogo</div>
 
-        {/* SubmenÃƒÆ’Ã‚Âº: escoger máquina */}
+        {/* Submenú: escoger máquina */}
         <div className="flex flex-col md:flex-row gap-2 md:items-center mb-3">
           <div className="flex items-center gap-2">
-            {/* SubmenÃƒÆ’Ã‚Âº: escoger máquina (versiÃƒÆ’Ã‚Â³n avatars) */}
+            {/* Submenú: escoger máquina (versión avatars) */}
             <div className="flex flex-col gap-2 mb-3">
               <MachinePicker
                 value={machineKey}
@@ -808,7 +808,7 @@ export default function SolicitudShow() {
                 <div className="flex gap-2 items-center ml-auto">
                   <input
                     className="input"
-                    placeholder="Buscar por clave o descripciÃƒÆ’Ã‚Â³n"
+                    placeholder="Buscar por clave o descripción"
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     onKeyDown={async (e) => {
@@ -887,8 +887,8 @@ export default function SolicitudShow() {
         )}
       </div>
 
-      {/* Modal: ClasificaciÃƒÆ’Ã‚Â³n antes de aprobar */}
-      {/* Modal: ClasificaciÃƒÆ’Ã‚Â³n antes de aprobar */}
+      {/* Modal: Clasificación antes de aprobar */}
+      {/* Modal: Clasificación antes de aprobar */}
       {clasifOpen && (
         <>
           {/* Backdrop con leve blur */}
@@ -903,36 +903,36 @@ export default function SolicitudShow() {
               {/* Header */}
               <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-start justify-between">
                 <div>
-                  <div className="text-lg font-semibold text-slate-900">ConfirmaciÃƒÆ’Ã‚Â³n</div>
-                  <div className="text-sm text-slate-600">Tip: recuerda verificar la gestiÃƒÆ’Ã‚Â³n.</div>
+                  <div className="text-lg font-semibold text-slate-900">Confirmación</div>
+                  <div className="text-sm text-slate-600">Tip: recuerda verificar la gestión.</div>
                 </div>
                 <button
                   className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
                   onClick={() => !savingClasif && setClasifOpen(false)}
                   aria-label="Cerrar"
                 >
-                  ÃƒÆ’Ã¢â‚¬â€
+                  ×
                 </button>
               </div>
 
               {/* Body */}
               <div className="px-5 py-4 space-y-4">
-                {/* ClasificaciÃƒÆ’Ã‚Â³n */}
+                {/* Clasificación */}
                 <div>
-                  <label className="text-sm font-medium text-slate-800">ClasificaciÃƒÆ’Ã‚Â³n de garantÃƒÆ’Ã‚Â­a</label>
+                  <label className="text-sm font-medium text-slate-800">Clasificación de garantía</label>
                   <select
                     className="input mt-1 bg-white focus:ring-2 focus:ring-blue-600"
                     value={clasifValue}
                     onChange={(e) => setClasifValue(e.target.value)}
                     disabled={savingClasif}
                   >
-                    <option value="">Selecciona una opciÃƒÆ’Ã‚Â³nÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</option>
+                    <option value="">Selecciona una opción…</option>
                     {CLASIF_OPTIONS.map((op) => (
                       <option key={op} value={op}>{op}</option>
                     ))}
                   </select>
                   {!clasifValue && (
-                    <p className="mt-1 text-xs text-slate-500">Selecciona una clasificaciÃƒÆ’Ã‚Â³n para continuar.</p>
+                    <p className="mt-1 text-xs text-slate-500">Selecciona una clasificación para continuar.</p>
                   )}
                 </div>
 
@@ -962,7 +962,7 @@ export default function SolicitudShow() {
                     onChange={(e) => setMedioEntregaValue(e.target.value)}
                     disabled={savingClasif}
                   >
-                    <option value="">Elige una opciÃƒÆ’Ã‚Â³n</option>
+                    <option value="">Elige una opción</option>
                     {MEDIO_ENTREGA_OPTIONS.map((op) => (
                       <option key={op} value={op}>{op}</option>
                     ))}
@@ -1005,7 +1005,7 @@ export default function SolicitudShow() {
                     }
                   }}
                 >
-                  {savingClasif ? "GuardandoÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦" : "Aprobar"}
+                  {savingClasif ? "Guardando…" : "Aprobar"}
                 </button>
               </div>
             </div>
@@ -1035,7 +1035,7 @@ export default function SolicitudShow() {
       {showSuccessModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/30 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl p-8 w-[90%] sm:w-[420px] text-center border border-slate-200 relative">
-            {/* Icono de ÃƒÆ’Ã‚Â©xito */}
+            {/* Icono de éxito */}
             <div className="flex justify-center mb-4">
               <div className="flex items-center justify-center w-14 h-14 rounded-full bg-green-100 animate-scale-in">
                 <svg
@@ -1053,13 +1053,13 @@ export default function SolicitudShow() {
               </div>
             </div>
 
-            {/* TÃƒÆ’Ã‚Â­tulo y mensaje */}
+            {/* Título y mensaje */}
             <h2 className="text-xl font-semibold text-green-700 mb-1">Comentario agregado</h2>
             <p className="text-sm text-slate-600 mb-6">
-              El comentario se publicÃƒÆ’Ã‚Â³ correctamente en Zoho.
+              El comentario se publicó correctamente en Zoho.
             </p>
 
-            {/* BotÃƒÆ’Ã‚Â³n */}
+            {/* Botón */}
             <button
               onClick={() => setShowSuccessModal(false)}
               className="w-full py-2.5 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 transition-all duration-200 shadow-sm"
@@ -1068,7 +1068,7 @@ export default function SolicitudShow() {
             </button>
           </div>
 
-          {/* AnimaciÃƒÆ’Ã‚Â³n sencilla */}
+          {/* Animación sencilla */}
           <style>
             {`
         @keyframes scaleIn {
@@ -1086,15 +1086,15 @@ export default function SolicitudShow() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/30">
           <div className="bg-white rounded-xl p-6 w-[90%] sm:w-[400px] shadow-xl">
 
-            <h2 className="text-lg font-semibold mb-3">Ãƒâ€šÃ‚Â¿QuÃƒÆ’Ã‚Â© tÃƒÆ’Ã‚Â©cnico atendiÃƒÆ’Ã‚Â³?</h2>
+            <h2 className="text-lg font-semibold mb-3">¿Qué técnico atendió?</h2>
 
             <select
               className="input w-full"
               value={tecnicoAsignado}
               onChange={(e) => setTecnicoAsignado(e.target.value)}
             >
-              <option value="">SeleccionaÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</option>
-              {/* OpciÃƒÆ’Ã‚Â³n extra */}
+              <option value="">Selecciona…</option>
+              {/* Opción extra */}
               <option value="Cliente Instala">Cliente Instala</option>
               {tecnicos.map((t) => (
                 <option key={t.id} value={t.nombre_tecnico}>
@@ -1113,18 +1113,18 @@ export default function SolicitudShow() {
                 disabled={!tecnicoAsignado}
                 onClick={async () => {
                   try {
-                    // 1. Guardar tÃƒÆ’Ã‚Â©cnico en la solicitud
+                    // 1. Guardar técnico en la solicitud
                     await setTecnicoSolicitud(id, tecnicoAsignado);
 
                     // 2. Cambiar estatus a LIBERADA
                     await mutCambiar.mutateAsync({
                       a: "LIBERADA",
-                      nota: `TÃƒÆ’Ã‚Â©cnico que atendiÃƒÆ’Ã‚Â³: ${tecnicoAsignado}`
+                      nota: `Técnico que atendió: ${tecnicoAsignado}`
                     });
 
                     setShowTecnicoModal(false);
                   } catch (err) {
-                    alert("Error guardando tÃƒÆ’Ã‚Â©cnico" + err);
+                    alert("Error guardando técnico" + err);
                   }
                 }}
               >
@@ -1175,7 +1175,7 @@ function PiezaDrawer({
           <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-white">
             <div>
               <div className="text-sm font-semibold text-slate-800">
-                {pieza?.clave_prod || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                {pieza?.clave_prod || "—"}
               </div>
               <div className="text-xs text-slate-500">
                 {pieza?.desc_prod || ""}
@@ -1288,7 +1288,7 @@ function PiezaDrawer({
                     <div className="ml-auto text-sm">
                       Total:{" "}
                       <span className="font-semibold">
-                        {qtyValid ? MXN_FORMAT.format(totalPreviewMXN) : "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                        {qtyValid ? MXN_FORMAT.format(totalPreviewMXN) : "—"}
                       </span>
                     </div>
 
@@ -1298,7 +1298,7 @@ function PiezaDrawer({
                       onClick={onAdd}
                       title={
                         !canAdd
-                          ? "No es posible agregar piezas mientras la solicitud está en revisiÃƒÆ’Ã‚Â³n"
+                          ? "No es posible agregar piezas mientras la solicitud está en revisión"
                           : !pieza
                             ? "Selecciona un producto"
                             : !qtyValid
@@ -1326,7 +1326,7 @@ function Spec({ label, value }) {
         {label}
       </div>
       <div className="text-sm font-medium break-words">
-        {value || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+        {value || "—"}
       </div>
     </div>
   );

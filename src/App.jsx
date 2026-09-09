@@ -10,8 +10,11 @@ import CatalogoPiezas from "./pages/CatalogoPiezas.jsx";
 import MainPage from "./pages/MainPage.jsx";
 import AlmacenPage from "./pages/AlmacenPage.jsx";
 import UsuariosAlmacenPage from "./pages/UsuariosAlmacenPage.jsx";
+import RegistroAlmacen from "./pages/RegistroAlmacen.jsx";
 
 const ROLES_GARANTIAS = ["garantias", "admin"];
+const ROLES_REGISTRO_ALMACEN = ["garantias", "admin", "almacen", "supervisor"];
+
 
 function Private({ children, roles }) {
   const { user, role, loading } = useAuth();
@@ -37,6 +40,13 @@ const IcoAlmacen = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/>
   </svg>
 );
+const IcoBarcode = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.5v3.75m0 7.5v3.75m16.5-15v3.75m0 7.5v3.75M7.5 7.5v9m3-9v9m3-9v9m3-9v9" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12h19.5" />
+  </svg>
+);
+
 const IcoCatalogo = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/>
@@ -136,7 +146,9 @@ function AppShell() {
               <Route path="/" element={<Private><SolicitudesList /></Private>} />
               <Route path="/main" element={<MainPage />} />
               <Route path="/almacen" element={<Private roles={[...ROLES_GARANTIAS, "solicitante", "almacen", "supervisor"]}><AlmacenPage /></Private>} />
+              <Route path="/almacen/registro" element={<Private roles={ROLES_REGISTRO_ALMACEN}><RegistroAlmacen /></Private>} />
               <Route path="/almacen/usuarios" element={<Private roles={["admin"]}><UsuariosAlmacenPage /></Private>} />
+
               <Route path="/create" element={<Private roles={[...ROLES_GARANTIAS, "solicitante"]}><SolicitudCreate /></Private>} />
               <Route path="/create/:zohoId" element={<Private roles={[...ROLES_GARANTIAS, "solicitante"]}><SolicitudCreate /></Private>} />
               <Route path="/s/:id" element={<Private roles={ROLES_GARANTIAS}><SolicitudShow /></Private>} />
@@ -186,11 +198,15 @@ function Sidebar({ onClose, collapsed, setCollapsed }) {
         </NavSection>
 
         <NavSection label="Almacén" collapsed={collapsed}>
-          <NavItem icon={<IcoAlmacen />} label="Movimientos" active={isActive("/almacen") && !isActive("/almacen/usuarios")} onClick={() => go("/almacen")} collapsed={collapsed} />
+          <NavItem icon={<IcoAlmacen />} label="Movimientos" active={isActive("/almacen") && !isActive("/almacen/usuarios") && !isActive("/almacen/registro")} onClick={() => go("/almacen")} collapsed={collapsed} />
+          {ROLES_REGISTRO_ALMACEN.includes(role) && (
+            <NavItem icon={<IcoBarcode />} label="Registro" active={isActive("/almacen/registro")} onClick={() => go("/almacen/registro")} collapsed={collapsed} />
+          )}
           {esAdmin && (
             <NavItem icon={<IcoUsers />} label="Usuarios PIN" active={isActive("/almacen/usuarios")} onClick={() => go("/almacen/usuarios")} collapsed={collapsed} />
           )}
         </NavSection>
+
 
         <NavSection label="Consulta" collapsed={collapsed}>
           <NavItem icon={<IcoCatalogo />} label="Catálogo de piezas" active={isActive("/catalogo")} onClick={() => go("/catalogo")} collapsed={collapsed} />
