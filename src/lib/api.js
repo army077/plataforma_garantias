@@ -85,6 +85,11 @@ export const cambiarEstadoItem = async (itemId, payload /* {actor_id, a, nota} *
 export const addItem = async (solId, payload) =>
   (await api.post(`/solicitudes/${solId}/items`, payload)).data;
 
+export const deleteItem = async (solId, itemId, actorId) =>
+  (await api.delete(`/solicitudes/${solId}/items/${itemId}`, {
+    data: { actor_id: actorId }
+  })).data;
+
 // Catálogo
 export const buscarProductos = async (q, start = 0, end = 10) =>
   (await api.get("/catalogo/productos", { params: { q, _start: start, _end: end } })).data;
@@ -137,9 +142,34 @@ export const actualizarEstatusMovimiento = async (id, status) =>
   (await api.put(`/almacen/movimientos/${id}/status`, { status })).data;
 
 // PUT: cerrar todos los movimientos por orden de producción
-export const cerrarMovimientosPorOrden = async (ordenProduccion) => {
+export const cerrarMovimientosPorOrden = async (ordenProduccion, pin) => {
   const { data } = await api.put(
-    `/almacen/movimientos/orden/${ordenProduccion}/cerrar`
+    `/almacen/movimientos/orden/${encodeURIComponent(ordenProduccion)}/cerrar`,
+    pin ? { pin } : {}
+  );
+  return data;
+};
+
+// PUT: reabrir una OP (requiere PIN)
+export const abrirOrdenProduccion = async (ordenProduccion, pin) => {
+  const { data } = await api.put(
+    `/almacen/movimientos/orden/${encodeURIComponent(ordenProduccion)}/abrir`,
+    pin ? { pin } : {}
+  );
+  return data;
+};
+
+// GET: listado de OPs cerradas (no admiten más solicitudes)
+export const listOrdenesCerradas = async () => {
+  const { data } = await api.get("/almacen/ordenes/cerradas");
+  return data;
+};
+
+// POST: alternar estado de una OP (abrir ↔ cerrar) usando PIN
+export const toggleOrdenProduccion = async (ordenProduccion, pin) => {
+  const { data } = await api.post(
+    `/almacen/ordenes/${encodeURIComponent(ordenProduccion)}/toggle`,
+    pin ? { pin } : {}
   );
   return data;
 };

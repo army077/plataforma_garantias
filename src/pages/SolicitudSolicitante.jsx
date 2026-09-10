@@ -21,7 +21,7 @@ const transiciones = {
   ENTREGADA: ["CERRADA"],
 };
 
-/* ----------------------- ConversiÃ³n y etiquetas ----------------------- */
+/* ----------------------- Conversión y etiquetas ----------------------- */
 const MXN_FORMAT = new Intl.NumberFormat("es-MX", {
   style: "currency",
   currency: "MXN",
@@ -53,7 +53,7 @@ function toMXN(amount = 0, moneda = "1") {
   return amount * rate;
 }
 
-/* ----------------------- Hardcode de piezas por mÃ¡quina ----------------------- */
+/* ----------------------- Hardcode de piezas por máquina ----------------------- */
 const machineParts = {
   MAKER0609: [
     "P00178", "P00183", "P00184", "P00185", "P00240", "P00241", "P00243", "P00244", "M00576", "P00295", "P02766",
@@ -114,7 +114,7 @@ const machineParts = {
   ]
 };
 
-// Etiquetas e imÃ¡genes de cada mÃ¡quina (en /public/img/*.png)
+// Etiquetas e imágenes de cada máquina (en /public/img/*.png)
 const MACHINE_META = {
   MAKER0609: { label: "Maker", img: "/img/maker0609.png" },
   BENDWORX: { label: "Bend Worx", img: "/img/bendworx.png" },
@@ -152,7 +152,7 @@ export default function SolicitudShow() {
 
   const [nota, setNota] = useState("");
 
-  // BÃºsqueda normal por texto
+  // Búsqueda normal por texto
   const [q, setQ] = useState("");
   const [productos, setProductos] = useState([]);
 
@@ -166,7 +166,7 @@ export default function SolicitudShow() {
     setCantidad(1);
   }, [selected?.id]);
 
-  // SubmenÃº de mÃ¡quinas
+  // Submenú de máquinas
   const [machineKey, setMachineKey] = useState("");
   const [partsLoading, setPartsLoading] = useState(false);
 
@@ -205,7 +205,7 @@ export default function SolicitudShow() {
   const costoMXN = toMXN(costo, costoCur);
   const totalPreviewMXN = selected && qtyValid ? qtyNum * costoMXN : 0;
 
-  // Bloquear altas si estÃ¡ en revisiÃ³n
+  // Bloquear altas si está en revisión
   const locked = s?.estado_code !== "CREADA";
 
 
@@ -236,7 +236,7 @@ export default function SolicitudShow() {
   };
 
   const handleAdd = () => {
-    if (locked) return;            // <- no permitir si estÃ¡ en revisiÃ³n
+    if (locked) return;            // <- no permitir si está en revisión
     if (!selected || !qtyValid) return;
     const p = selected;
     console.log(usuarioId);
@@ -252,11 +252,11 @@ export default function SolicitudShow() {
       moneda_precio: p.moneda_precio || "1",
       moneda_costo: p.moneda_costo || "1",
       motivo: "Definir motivo",
-      comentarios: "Agregado desde catÃ¡logo",
+      comentarios: "Agregado desde catálogo",
     });
   };
 
-  // Carga sugerencias por mÃ¡quina
+  // Carga sugerencias por máquina
   const loadMachineParts = async () => {
     if (!machineKey) return;
     const claves = machineParts[machineKey] || [];
@@ -267,7 +267,7 @@ export default function SolicitudShow() {
 
     setPartsLoading(true);
     try {
-      // Buscar por cada clave. Si tu backend soporta mÃºltiple, reemplaza por un endpoint decente.
+      // Buscar por cada clave. Si tu backend soporta múltiple, reemplaza por un endpoint decente.
       const results = await Promise.all(
         claves.map(async (clave) => {
           try {
@@ -345,18 +345,18 @@ export default function SolicitudShow() {
         )}
       </div>
 
-      {/* Agregar item desde catÃ¡logo */}
+      {/* Agregar item desde catálogo */}
       <div className="card">
-        <div className="font-semibold mb-2">Agregar item desde catÃ¡logo</div>
+        <div className="font-semibold mb-2">Agregar item desde catálogo</div>
 
         {locked ? (
           <div className="rounded-xl border border-amber-300/60 bg-amber-50 text-amber-900 p-3">
-            Esta solicitud estÃ¡ <span className="font-semibold">en revisiÃ³n</span> por parte del Ã¡rea de garantÃ­as.
+            Esta solicitud está <span className="font-semibold">en revisión</span> por parte del área de garantías.
             Por ahora no es posible agregar nuevas piezas.
           </div>
         ) : (
           <>
-            {/* SubmenÃº: escoger mÃ¡quina */}
+            {/* Submenú: escoger máquina */}
             <div className="flex flex-col md:flex-row gap-2 md:items-center mb-3">
               <div className="flex items-center gap-2">
                 <div className="flex flex-col gap-2 mb-3">
@@ -381,7 +381,7 @@ export default function SolicitudShow() {
                     <div className="flex gap-2 items-center ml-auto">
                       <input
                         className="input"
-                        placeholder="Buscar por clave o descripciÃ³n"
+                        placeholder="Buscar por clave o descripción"
                         value={q}
                         onChange={(e) => setQ(e.target.value)}
                         onKeyDown={async (e) => {
@@ -433,9 +433,9 @@ export default function SolicitudShow() {
         )}
       </div>
 
-      {/* BitÃ¡cora */}
+      {/* Bitácora */}
       <div className="card">
-        <div className="font-semibold mb-2 text-slate-800">BitÃ¡cora</div>
+        <div className="font-semibold mb-2 text-slate-800">Bitácora</div>
         {s.bitacora?.length ? (
           s.bitacora.map((b) => (
             <div
@@ -626,7 +626,7 @@ function PiezaDrawer({
                         })
                       }
                       disabled={!pieza}
-                      title="MÃ¡s"
+                      title="Más"
                     >
                       +
                     </button>
@@ -644,11 +644,11 @@ function PiezaDrawer({
                       onClick={onAdd}
                       title={
                         !canAdd
-                          ? "No es posible agregar piezas mientras la solicitud estÃ¡ en revisiÃ³n"
+                          ? "No es posible agregar piezas mientras la solicitud está en revisión"
                           : !pieza
                             ? "Selecciona un producto"
                             : !qtyValid
-                              ? "Cantidad invÃ¡lida"
+                              ? "Cantidad inválida"
                               : "Agregar"
                       }
                     >

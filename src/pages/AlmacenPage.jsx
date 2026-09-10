@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     listAlmacenMovimientos,
     createAlmacenMovimiento,
@@ -11,6 +11,8 @@ import {
     updateAlmacenMovimiento,
     deleteAlmacenMovimiento,
     cerrarMovimientosPorOrden,
+    listOrdenesCerradas,
+    toggleOrdenProduccion,
     validarPinUsuario
 } from "../lib/api.js";
 import EstadoBadge from "../components/EstadoBadge";
@@ -18,6 +20,8 @@ import { useAuth } from "../auth/AuthProvider.jsx";
 import { useNavigate } from "react-router-dom";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import LockIcon from "@mui/icons-material/Lock";
+import LockOpenIcon from "@mui/icons-material/LockOpen";
 
 export default function AlmacenPage() {
     const { user, role, usuarioId } = useAuth();
@@ -51,6 +55,18 @@ export default function AlmacenPage() {
     const [pinCerrar, setPinCerrar] = useState("");
     const [ordenCerrar, setOrdenCerrar] = useState("");
 
+    // OPs cerradas (no admiten nuevas solicitudes)
+    const [ordenesCerradas, setOrdenesCerradas] = useState(new Set());
+
+    // Modal: alternar candado (cerrar/abrir OP) desde la fila
+    const [toggleModalOpen, setToggleModalOpen] = useState(false);
+    const [toggleOrden, setToggleOrden] = useState("");
+    const [togglePin, setTogglePin] = useState("");
+    const [toggleProximoEstado, setToggleProximoEstado] = useState(""); // "CERRADA" | "ABIERTA"
+
+    // ID de la fila cuyo select de Movimiento está guardando
+    const [loadingStatusId, setLoadingStatusId] = useState(null);
+
 
     const [form, setForm] = useState({
         persona: "",
@@ -83,16 +99,30 @@ export default function AlmacenPage() {
     const [listaPiezas, setListaPiezas] = useState([]);
 
     const load = async () => {
-        const data = await listAlmacenMovimientos();
+        const [data, cerradas] = await Promise.all([
+            listAlmacenMovimientos(),
+            listOrdenesCerradas().catch(() => [])
+        ]);
         setRows(data);
 
         // Obtener órdenes únicas
         const setOrdenes = Array.from(
             new Set(data.map(r => r.orden_produccion).filter(Boolean))
         );
-
         setOrdenesUnicas(setOrdenes);
+
+        // Indexar OPs cerradas
+        setOrdenesCerradas(
+            new Set((cerradas || []).map(c => String(c.orden_produccion)))
+        );
     };
+
+    // Helpers OP cerrada
+    const esOrdenCerrada = (op) => ordenesCerradas.has(String(op || "").trim());
+    const ordenesAbiertas = useMemo(
+        () => ordenesUnicas.filter(op => !ordenesCerradas.has(String(op || "").trim())),
+        [ordenesUnicas, ordenesCerradas]
+    );
 
     const handleBuscarProd = async (q) => {
         if (!q.trim()) return setProductos([]);
@@ -161,6 +191,13 @@ export default function AlmacenPage() {
             return;
         }
 
+        // 🚫 Bloqueo en cliente si la OP está cerrada
+        const ordenIngresada = String(formHeader.orden_produccion).trim();
+        if (esOrdenCerrada(ordenIngresada)) {
+            alert(`La Orden ${ordenIngresada} está cerrada. No se pueden registrar más movimientos.`);
+            return;
+        }
+
         if (listaPiezas.length === 0) {
             alert("Agrega al menos una pieza.");
             return;
@@ -187,7 +224,36 @@ export default function AlmacenPage() {
             alert("Solicitudes creadas correctamente.");
         } catch (e) {
             console.error(e);
-            alert("Error al guardar.");
+            // Surfaceamos el mensaje del backend (ej. OP_CERRADA)
+            const msg = e?.response?.data?.error || "Error al guardar.";
+            alert(msg);
+        }
+    };
+
+    // ---- Candado: alternar cerrar/abrir OP desde la fila ----
+    const abrirToggleModal = (orden) => {
+        const op = String(orden || "").trim();
+        if (!op) return;
+        setToggleOrden(op);
+        setToggleProximoEstado(esOrdenCerrada(op) ? "ABIERTA" : "CERRADA");
+        setTogglePin("");
+        setToggleModalOpen(true);
+    };
+
+    const confirmarToggleOP = async () => {
+        if (!togglePin || !toggleOrden) {
+            alert("Debes ingresar PIN.");
+            return;
+        }
+        try {
+            await toggleOrdenProduccion(toggleOrden, togglePin);
+            setToggleModalOpen(false);
+            setTogglePin("");
+            setToggleOrden("");
+            await load();
+        } catch (err) {
+            const msg = err?.response?.data?.error || "No se pudo cambiar el estado de la OP.";
+            alert(msg);
         }
     };
 
@@ -206,8 +272,8 @@ export default function AlmacenPage() {
                 return;
             }
 
-            // 2) cerrar movimientos por orden
-            await cerrarMovimientosPorOrden(ordenCerrar);
+            // 2) cerrar movimientos por orden (manda PIN al backend también)
+            await cerrarMovimientosPorOrden(ordenCerrar, pinCerrar);
 
             // 3) refrescar data
             await load();
@@ -336,28 +402,41 @@ export default function AlmacenPage() {
             </div>
 
             <div className="card p-0 overflow-x-auto">
+                {/* LEYENDA DE CANDADOS */}
+                <div className="px-6 py-3 border-b border-slate-200 bg-slate-50/60 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-slate-600">
+                    <span className="font-semibold text-slate-700">Leyenda de candados:</span>
+                    <span className="inline-flex items-center gap-1.5">
+                        <LockOpenIcon className="text-emerald-600" style={{ fontSize: 16 }} />
+                        <span><strong className="text-emerald-700">OP activa</strong> &mdash; se pueden registrar solicitudes</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                        <LockIcon className="text-red-600" style={{ fontSize: 16 }} />
+                        <span><strong className="text-red-700">OP cerrada</strong> &mdash; no admite nuevas solicitudes</span>
+                    </span>
+                    {(role === "admin" || role === "supervisor" || role === "almacen") && (
+                        <span className="text-slate-500">
+                            &middot; Haz clic en el candado para alternar (requiere PIN)
+                        </span>
+                    )}
+                </div>
+
                 <div className="overflow-hidden">
 
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                                <th className="px-6 py-3 text-left">ID</th>
-                                <th className="px-6 py-3 text-left">Persona</th>
-                                <th className="px-6 py-3 text-left">Orden</th>
-                                <th className="px-6 py-3 text-left">N° Parte</th>
-                                <th className="px-6 py-3 text-center">Cant</th>
-                                <th className="px-6 py-3 text-center">Estatus</th>
-                                <th className="px-6 py-3 text-center">
-                                    {(role === "admin" || role === "almacen") && (
-                                        "Movimiento"
-                                    )}
+                                <th className="px-4 py-3 text-left">ID</th>
+                                <th className="px-4 py-3 text-left">Persona</th>
+                                <th className="px-4 py-3 text-left">Orden</th>
+                                <th className="px-4 py-3 text-left">N° Parte</th>
+                                <th className="px-4 py-3 text-center">Cant</th>
+                                <th className="px-4 py-3 text-center">Estatus</th>
+                                <th className="px-4 py-3 text-center">
+                                    {(role === "admin" || role === "almacen") && "Movimiento"}
                                 </th>
-                                <th className="px-6 py-3 text-center">
-                                    {(role === "admin" || role === "almacen") && (
-                                        "Acciones"
-                                    )}
+                                <th className="px-4 py-3 text-center">
+                                    {(role === "admin" || role === "almacen") && "Acciones"}
                                 </th>
-                                <th className="px-6 py-3"></th>
                             </tr>
                         </thead>
 
@@ -371,103 +450,124 @@ export default function AlmacenPage() {
                                         setModalOpen(true);
                                     }}
                                 >
-                                    <td className="px-6 py-4 font-medium text-slate-800">{r.id}</td>
+                                    <td className="px-4 py-3 font-medium text-slate-800">{r.id}</td>
 
-                                    <td className="px-6 py-4">
-                                        <div className="font-semibold text-slate-800">
-                                            {r.persona}
-                                        </div>
-                                        <div className="text-xs text-slate-400">
-                                            Estación {r.estacion}
-                                        </div>
+                                    <td className="px-4 py-3">
+                                        <div className="font-semibold text-slate-800">{r.persona}</div>
+                                        <div className="text-xs text-slate-400">Estación {r.estacion}</div>
                                     </td>
 
-                                    <td className="px-6 py-4 text-slate-700">{r.orden_produccion}</td>
+                                    <td className="px-4 py-3 text-slate-700">{r.orden_produccion}</td>
 
-                                    <td className="px-6 py-4">
+                                    <td className="px-4 py-3">
                                         <span className="font-mono bg-slate-50 px-2 py-1 rounded text-slate-700 border border-slate-200 text-xs">
                                             {r.numero_parte}
                                         </span>
                                     </td>
 
-                                    <td className="px-6 py-4 text-center font-semibold">
+                                    <td className="px-4 py-3 text-center font-semibold">
                                         {Number(r.cantidad).toFixed(2)}
                                     </td>
 
-                                    <td className="px-6 py-4 text-center">
-                                        <span
-                                            className={`
-                                                inline-flex px-3 py-1 rounded-full text-xs font-semibold
-                                                ${r.status === "PENDIENTE"
-                                                    ? "bg-amber-100 text-amber-800 border border-amber-300"
-                                                    : "bg-emerald-100 text-emerald-800 border border-emerald-300"}
-                                            `}
-                                        >
+                                    <td className="px-4 py-3 text-center">
+                                        <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                            r.status === "PENDIENTE"
+                                                ? "bg-amber-100 text-amber-800 border border-amber-300"
+                                                : "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                        }`}>
                                             {r.status}
                                         </span>
                                     </td>
 
-                                    <td className="px-6 py-4">
+                                    <td className="px-4 py-3">
                                         {(role === "admin" || role === "almacen") && (
-                                            <select
-                                                className="border rounded-lg px-2 py-1 text-xs bg-white"
-                                                value={r.estatus_movimiento}
-                                                onChange={(e) => {
-                                                    e.stopPropagation();
-
-                                                    const nuevo = e.target.value;
-                                                    const anterior = r.estatus_movimiento;
-
-                                                    // SOLO pedir PIN cuando pasa de SIN ENTREGAR → otro estatus
-                                                    const requierePin =
-                                                        anterior === "SIN ENTREGAR" &&
-                                                        (nuevo === "ENTREGADO" || nuevo === "CARGADO");
-
-                                                    if (requierePin) {
-                                                        setMovimientoSeleccionado(r);
-                                                        setNuevoStatus(nuevo);
-                                                        setPinModalStatusOpen(true);
-                                                        return;
-                                                    }
-
-                                                    // Cambios normales SIN PIN
-                                                    actualizarEstatusMovimiento(r.id, nuevo);
-                                                    load();
-                                                }}
-                                                onClick={(e) => e.stopPropagation()}
-                                                onMouseDown={(e) => e.stopPropagation()}
-                                            >
-                                                <option value="SIN ENTREGAR">Sin entregar</option>
-                                                <option value="ENTREGADO">Entregado</option>
-                                                <option value="CARGADO">Cargado (SAI)</option>
-                                            </select>
+                                            loadingStatusId === r.id ? (
+                                                <div className="flex items-center gap-2 text-xs text-slate-500">
+                                                    <svg
+                                                        className="animate-spin h-4 w-4 text-blue-500 shrink-0"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <circle
+                                                            className="opacity-25"
+                                                            cx="12" cy="12" r="10"
+                                                            stroke="currentColor" strokeWidth="4"
+                                                        />
+                                                        <path
+                                                            className="opacity-75"
+                                                            fill="currentColor"
+                                                            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                                                        />
+                                                    </svg>
+                                                    Guardando…
+                                                </div>
+                                            ) : (
+                                                <select
+                                                    className="border rounded-lg px-2 py-1 text-xs bg-white"
+                                                    value={r.estatus_movimiento}
+                                                    onChange={(e) => {
+                                                        e.stopPropagation();
+                                                        const nuevo = e.target.value;
+                                                        const anterior = r.estatus_movimiento;
+                                                        const requierePin =
+                                                            anterior === "SIN ENTREGAR" &&
+                                                            (nuevo === "ENTREGADO" || nuevo === "CARGADO");
+                                                        if (requierePin) {
+                                                            setMovimientoSeleccionado(r);
+                                                            setNuevoStatus(nuevo);
+                                                            setPinModalStatusOpen(true);
+                                                            return;
+                                                        }
+                                                        // Actualización optimista: reflejar el cambio localmente de inmediato
+                                                        setRows(prev => prev.map(row =>
+                                                            row.id === r.id ? { ...row, estatus_movimiento: nuevo } : row
+                                                        ));
+                                                        setLoadingStatusId(r.id);
+                                                        actualizarEstatusMovimiento(r.id, nuevo)
+                                                            .catch(() => {
+                                                                // Revertir si el backend falla
+                                                                setRows(prev => prev.map(row =>
+                                                                    row.id === r.id ? { ...row, estatus_movimiento: anterior } : row
+                                                                ));
+                                                                alert("Error al actualizar el estatus");
+                                                            })
+                                                            .finally(() => {
+                                                                setLoadingStatusId(null);
+                                                                load();
+                                                            });
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    onMouseDown={(e) => e.stopPropagation()}
+                                                >
+                                                    <option value="SIN ENTREGAR">Sin entregar</option>
+                                                    <option value="ENTREGADO">Entregado</option>
+                                                    <option value="CARGADO">Cargado (SAI)</option>
+                                                </select>
+                                            )
                                         )}
                                     </td>
 
+                                    {/* ACCIONES: editar + eliminar + candado OP + atender */}
                                     <td
-                                        className="px-6 py-4 text-right"
+                                        className="px-4 py-3"
                                         onClick={(e) => e.stopPropagation()}
                                     >
                                         {(role === "admin" || role === "almacen") && (
-                                            <div className="flex items-center gap-3 justify-end">
+                                            <div className="flex items-center gap-2">
 
                                                 {/* EDITAR */}
                                                 <button
-                                                    className="p-1.5 rounded-lg border border-slate-200 bg-white 
-                                                            hover:bg-slate-50 transition"
+                                                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition"
                                                     title="Editar"
-                                                    onClick={() => {
-                                                        setEditForm(r);
-                                                        setEditModalOpen(true);
-                                                    }}
+                                                    onClick={() => { setEditForm(r); setEditModalOpen(true); }}
                                                 >
                                                     <EditIcon className="text-slate-600" fontSize="small" />
                                                 </button>
 
                                                 {/* ELIMINAR */}
                                                 <button
-                                                    className="p-1.5 rounded-lg border border-red-300 bg-red-50 
-                                                        hover:bg-red-100 transition"
+                                                    className="p-1.5 rounded-lg border border-red-300 bg-red-50 hover:bg-red-100 transition"
                                                     title="Eliminar"
                                                     onClick={async () => {
                                                         if (!confirm("¿Eliminar registro?")) return;
@@ -478,22 +578,66 @@ export default function AlmacenPage() {
                                                     <DeleteIcon className="text-red-700" fontSize="small" />
                                                 </button>
 
-                                            </div>
-                                        )}
-                                    </td>
+                                                {/* CANDADO OP */}
+                                                {(() => {
+                                                    const cerrada = esOrdenCerrada(r.orden_produccion);
+                                                    const puedeAlternar = role === "admin" || role === "supervisor" || role === "almacen";
 
-                                    <td className="px-6 py-4 text-right">
-                                        {(role === "admin" || role === "almacen") && r.status === "PENDIENTE" && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setMovimientoSeleccionado(r);
-                                                    setPinModalOpen(true);
-                                                }}
-                                                className="px-3 py-1 text-xs rounded-lg border border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
-                                            >
-                                                Atender
-                                            </button>
+                                                    // Para cerrar: verificar que TODOS los movimientos de esta OP estén en CARGADO
+                                                    const lineasDeOp = rows.filter(
+                                                        (m) => m.orden_produccion === r.orden_produccion
+                                                    );
+                                                    const todasCargadas = lineasDeOp.length > 0 &&
+                                                        lineasDeOp.every(
+                                                            (m) => String(m.estatus_movimiento || "").toUpperCase() === "CARGADO"
+                                                        );
+
+                                                    // Solo bloquear el clic de cerrar; reabrir siempre se puede
+                                                    const puedeAccionar = puedeAlternar && (cerrada || todasCargadas);
+
+                                                    const title = !puedeAlternar
+                                                        ? "Sin permisos para cambiar el estado de la OP"
+                                                        : cerrada
+                                                            ? `Orden ${r.orden_produccion} CERRADA — clic para reabrir`
+                                                            : todasCargadas
+                                                                ? `Orden ${r.orden_produccion} ACTIVA — clic para cerrar`
+                                                                : `No se puede cerrar: hay movimientos sin Cargar en SAI`;
+
+                                                    const cls = cerrada
+                                                        ? "border-red-300 bg-red-50 hover:bg-red-100 text-red-700"
+                                                        : todasCargadas
+                                                            ? "border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700"
+                                                            : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed opacity-60";
+
+                                                    return (
+                                                        <button
+                                                            className={`p-1.5 rounded-lg border transition ${cls}`}
+                                                            title={title}
+                                                            disabled={!puedeAccionar}
+                                                            onClick={() => puedeAccionar && abrirToggleModal(r.orden_produccion)}
+                                                        >
+                                                            {cerrada
+                                                                ? <LockIcon fontSize="small" />
+                                                                : <LockOpenIcon fontSize="small" />}
+                                                        </button>
+                                                    );
+                                                })()}
+
+                                                {/* ATENDER */}
+                                                {r.status === "PENDIENTE" && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setMovimientoSeleccionado(r);
+                                                            setPinModalOpen(true);
+                                                        }}
+                                                        className="px-3 py-1 text-xs rounded-lg border border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 transition whitespace-nowrap"
+                                                    >
+                                                        Atender
+                                                    </button>
+                                                )}
+
+                                            </div>
                                         )}
                                     </td>
 
@@ -592,11 +736,22 @@ export default function AlmacenPage() {
                                 />
 
                                 <input
-                                    className="input"
-                                    placeholder="Orden de producción"
+                                    className={`input ${esOrdenCerrada(formHeader.orden_produccion) ? "border-red-400 focus:border-red-500" : ""}`}
+                                    placeholder="Orden de producción (activa)"
+                                    list="ordenes-abiertas"
                                     value={formHeader.orden_produccion}
                                     onChange={(e) => setFormHeader({ ...formHeader, orden_produccion: e.target.value })}
                                 />
+                                <datalist id="ordenes-abiertas">
+                                    {ordenesAbiertas.map((op) => (
+                                        <option key={op} value={op} />
+                                    ))}
+                                </datalist>
+                                {esOrdenCerrada(formHeader.orden_produccion) && (
+                                    <p className="text-xs text-red-600 -mt-2">
+                                        La Orden {formHeader.orden_produccion} está cerrada. No se pueden registrar más movimientos.
+                                    </p>
+                                )}
 
                                 <select
                                     className="input"
@@ -913,7 +1068,7 @@ export default function AlmacenPage() {
 
                         <div className="flex flex-col items-center text-center mb-4">
                             <div className="p-3 bg-blue-50 rounded-full mb-3">
-                                <img src="/lock-icon.svg" className="w-8 h-8" />
+                                <LockIcon className="text-blue-500" style={{ fontSize: 32 }} />
                             </div>
                             <h2 className="text-lg font-semibold text-slate-900">Confirmar Atención</h2>
                             <p className="text-slate-500 text-sm mt-1">
@@ -977,7 +1132,7 @@ export default function AlmacenPage() {
 
                         <div className="flex flex-col items-center text-center mb-4">
                             <div className="p-3 bg-blue-50 rounded-full mb-3">
-                                <img src="/lock-icon.svg" className="w-8 h-8" />
+                                <LockIcon className="text-blue-500" style={{ fontSize: 32 }} />
                             </div>
                             <h2 className="text-lg font-semibold text-slate-900">Confirmar Entrega</h2>
                             <p className="text-slate-500 text-sm mt-1">
@@ -1072,11 +1227,13 @@ export default function AlmacenPage() {
                                     onChange={(e) => setOrdenCerrar(e.target.value)}
                                 >
                                     <option value="">Selecciona orden de producción</option>
-                                    {ordenesUnicas.map((op) => (
-                                        <option key={op} value={op}>
-                                            {op}
-                                        </option>
-                                    ))}
+                                    {ordenesUnicas
+                                        .filter((op) => !esOrdenCerrada(op))
+                                        .map((op) => (
+                                            <option key={op} value={op}>
+                                                {op}
+                                            </option>
+                                        ))}
                                 </select>
                             </div>
 
@@ -1105,6 +1262,66 @@ export default function AlmacenPage() {
                                 }}
                             >
                                 Aceptar
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {toggleModalOpen && (
+                <>
+                    <div
+                        className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-40"
+                        onClick={() => setToggleModalOpen(false)}
+                    />
+
+                    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+                        bg-white w-[90%] max-w-sm rounded-xl shadow-2xl p-6
+                        z-50 border border-slate-200">
+
+                        <div className="flex flex-col items-center text-center mb-4">
+                            <div className={`p-3 rounded-full mb-3 ${toggleProximoEstado === "CERRADA" ? "bg-red-50" : "bg-emerald-50"}`}>
+                                {toggleProximoEstado === "CERRADA"
+                                    ? <LockIcon className="text-red-600" />
+                                    : <LockOpenIcon className="text-emerald-600" />}
+                            </div>
+                            <h2 className="text-lg font-semibold text-slate-900">
+                                {toggleProximoEstado === "CERRADA" ? "Cerrar OP" : "Reabrir OP"} {toggleOrden}
+                            </h2>
+                            <p className="text-slate-500 text-sm mt-1">
+                                {toggleProximoEstado === "CERRADA"
+                                    ? "Una vez cerrada, no se podrán registrar más solicitudes contra esta orden."
+                                    : "Al reabrirla, se podrán registrar nuevas solicitudes nuevamente."}
+                            </p>
+                        </div>
+
+                        <label className="text-xs font-semibold text-slate-500 uppercase">
+                            Firma / PIN
+                        </label>
+
+                        <input
+                            className="input mt-1 mb-4"
+                            placeholder="Ingresa tu clave…"
+                            value={togglePin}
+                            onChange={(e) => setTogglePin(e.target.value)}
+                        />
+
+                        <div className="flex justify-between mt-2 gap-3">
+                            <button
+                                className="btn flex-1"
+                                onClick={() => {
+                                    setToggleModalOpen(false);
+                                    setTogglePin("");
+                                }}
+                            >
+                                Cancelar
+                            </button>
+
+                            <button
+                                className={`btn flex-1 ${toggleProximoEstado === "CERRADA" ? "btn-danger" : "btn-primary"}`}
+                                onClick={confirmarToggleOP}
+                            >
+                                Confirmar
                             </button>
                         </div>
                     </div>

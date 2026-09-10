@@ -82,9 +82,13 @@ export default function App() {
 }
 
 function AppShell() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen text-sm text-slate-400">Cargando sesión…</div>;
+  }
 
   if (!user) {
     return (
