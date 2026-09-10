@@ -53,7 +53,7 @@ const MONEDA_LABEL = {
 const CLASIF_OPTIONS = [
   "Instalación",
   "Garantía de Equipo",
-  "Garantía de Componente/ Servicio",
+  "Garantía de Componente / Servicio",
   "Cortesía",
   "Marketing"
 ];
@@ -158,7 +158,7 @@ const MACHINE_META = {
   SAAP: { label: "SAAP", img: "/img/saap.png" },
 };
 
-/* Etiquetas  para el dropdown */
+/* Etiquetas "bonitas" para el dropdown */
 const MACHINE_LABEL = {
   MAKER0609: "Maker",
   BENDWORX: "Bend Worx",
@@ -207,7 +207,7 @@ function buildEntregaHTML(solicitud) {
   return `
   <div style="font-family: ui-sans-serif, system-ui, Segoe UI, Roboto, Arial; color:#0f172a;">
     <div style="padding:16px; border-radius:12px; background:#f3f4f6; border:1px solid #d1d5db;">
-      <h2 style="margin:0 0 6px; font-size:18px;">Orden de Trabajo entregada</h2>
+      <h2 style="margin:0 0 6px; font-size:18px;">Orden de Trabajo entregada ✅</h2>
       <div style="font-size:12px; color:#475569; margin-bottom:10px;">Estatus: <strong>PIEZAS ENTREGADAS</strong>.</div>
 
       <table style="width:100%; border-collapse:separate; border-spacing:0 8px; font-size:13px;">
@@ -549,7 +549,7 @@ export default function SolicitudShow() {
                 : "btn-primary"
                 }`}
               onClick={async () => {
-                // Caso especial: APROBADA desde EN_REVISION
+                // 👉 Caso especial: APROBADA desde EN_REVISION
                 if (a === "APROBADA" && s?.estado_code === "EN_REVISION") {
                   setClasifOpen(true);
                   return;
@@ -566,11 +566,11 @@ export default function SolicitudShow() {
                   await mutCerrar.mutateAsync(hoy);   // <--- tu API para fecha_salida
                 }
 
-                // Caso especial: COMENTARIO ZOHO agrega comentario, no cambia estado
+                // 👉 Caso especial: COMENTARIO ZOHO → agrega comentario, no cambia estado
                 if (a === "COMENTARIO ZOHO") {
                   const ticketId = s?.ticket_id_externo;
                   if (!ticketId) {
-                    console.warn("No se encontró ticket_id_externo");
+                    console.warn("⚠️ No se encontró ticket_id_externo");
                     return;
                   }
 
@@ -578,18 +578,18 @@ export default function SolicitudShow() {
                   try {
                     const html = buildEntregaHTML(s);
                     await addZohoComment({ ticketId, message: html, isPublic: true });
-                    console.log("Comentario agregado manualmente a Zoho");
-                    setShowSuccessModal(true); // muestra modal
+                    console.log("✅ Comentario agregado manualmente a Zoho");
+                    setShowSuccessModal(true); // 👆 muestra modal
                   } catch (err) {
-                    console.error("Error al enviar comentario a Zoho:", err);
+                    console.error("❌ Error al enviar comentario a Zoho:", err);
                     alert("Error al enviar comentario a Zoho");
                   } finally {
                     setLoadingZoho(false);
                   }
-                  return; // evita ejecutar mutCambiar.mutate
+                  return; // 👆 evita ejecutar mutCambiar.mutate
                 }
 
-                // Resto de transiciones normales
+                // 👉 Resto de transiciones normales
                 mutCambiar.mutate({ a, nota });
               }}
             >
@@ -640,7 +640,7 @@ export default function SolicitudShow() {
                         />
                         {mutDescripcionItem.isLoading &&
                           mutDescripcionItem.variables?.itemId === it.id && (
-                            <span className="text-xs text-blue-600">Guardando...</span>
+                            <span className="text-xs text-blue-600">Guardando…</span>
                           )}
                       </div>
                     ) : (
@@ -652,7 +652,7 @@ export default function SolicitudShow() {
                     <div className="text-xs text-slate-500 uppercase tracking-wide">
                       ESTADO:{" "}
                       <span className="font-semibold text-slate-700">
-                        {it.estado_pieza_code || "N/A"}
+                        {it.estado_pieza_code || "—"}
                       </span>
                     </div>
                   </div>
@@ -778,17 +778,17 @@ export default function SolicitudShow() {
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                         </svg>
-                        {mutDeleteItem.isLoading && mutDeleteItem.variables === it.id ? "Eliminando..." : "Eliminar"}
+                        {mutDeleteItem.isLoading && mutDeleteItem.variables === it.id ? "Eliminando…" : "Eliminar"}
                       </button>
                     )}
                     <div className="flex items-center ml-auto">
                       {mutCantidadItem.isLoading &&
                         mutCantidadItem.variables?.itemId === it.id && (
-                          <span className="text-blue-600">Guardando cantidad...</span>
+                          <span className="text-blue-600">Guardando cantidad…</span>
                         )}
                       {mutCostoItem.isLoading &&
                         mutCostoItem.variables?.itemId === it.id && (
-                          <span className="text-blue-600 ml-4">Guardando costo...</span>
+                          <span className="text-blue-600 ml-4">Guardando costo…</span>
                         )}
                     </div>
                   </div>
@@ -950,7 +950,7 @@ export default function SolicitudShow() {
                     onChange={(e) => setClasifValue(e.target.value)}
                     disabled={savingClasif}
                   >
-                    <option value="">Selecciona una opción...</option>
+                    <option value="">Selecciona una opción…</option>
                     {CLASIF_OPTIONS.map((op) => (
                       <option key={op} value={op}>{op}</option>
                     ))}
@@ -1029,7 +1029,7 @@ export default function SolicitudShow() {
                     }
                   }}
                 >
-                  {savingClasif ? "Guardando..." : "Aprobar"}
+                  {savingClasif ? "Guardando…" : "Aprobar"}
                 </button>
               </div>
             </div>
@@ -1117,7 +1117,7 @@ export default function SolicitudShow() {
               value={tecnicoAsignado}
               onChange={(e) => setTecnicoAsignado(e.target.value)}
             >
-              <option value="">Selecciona...</option>
+              <option value="">Selecciona…</option>
               {/* Opción extra */}
               <option value="Cliente Instala">Cliente Instala</option>
               {tecnicos.map((t) => (
@@ -1199,7 +1199,7 @@ function PiezaDrawer({
           <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-white">
             <div>
               <div className="text-sm font-semibold text-slate-800">
-                {pieza?.clave_prod || "N/A"}
+                {pieza?.clave_prod || "—"}
               </div>
               <div className="text-xs text-slate-500">
                 {pieza?.desc_prod || ""}
@@ -1312,7 +1312,7 @@ function PiezaDrawer({
                     <div className="ml-auto text-sm">
                       Total:{" "}
                       <span className="font-semibold">
-                        {qtyValid ? MXN_FORMAT.format(totalPreviewMXN) : "N/A"}
+                        {qtyValid ? MXN_FORMAT.format(totalPreviewMXN) : "—"}
                       </span>
                     </div>
 
@@ -1350,7 +1350,7 @@ function Spec({ label, value }) {
         {label}
       </div>
       <div className="text-sm font-medium break-words">
-        {value || "N/A"}
+        {value || "—"}
       </div>
     </div>
   );

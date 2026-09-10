@@ -127,7 +127,7 @@ const MACHINE_META = {
   SAAP: { label: "SAAP", img: "/img/saap.png" },
 };
 
-/* Etiquetas â€œbonitasâ€ para el dropdown */
+/* Etiquetas "bonitas" para el dropdown */
 const MACHINE_LABEL = {
   MAKER0609: "Maker",
   BENDWORX: "Bend Worx",
@@ -307,10 +307,10 @@ export default function SolicitudShow() {
         <div className="flex items-start justify-between">
           <div>
             <div className="font-semibold text-lg">
-              Solicitud #{s.id} â€¢ {s.cliente_label}
+              Solicitud #{s.id} • {s.cliente_label}
             </div>
             <div className="text-sm text-slate-400">
-              Ticket {s.ticket_label} â€¢ {new Date(s.creado_en).toLocaleString()}
+              Ticket {s.ticket_label} • {new Date(s.creado_en).toLocaleString()}
             </div>
           </div>
           <EstadoBadge code={s.estado_code} />
@@ -328,10 +328,10 @@ export default function SolicitudShow() {
             >
               <div>
                 <div className="font-medium">
-                  {it.numero_parte} â€¢ {it.descripcion}
+                  {it.numero_parte} • {it.descripcion}
                 </div>
                 <div className="text-sm text-slate-400">
-                  Cant: {it.cantidad} {it.unidad} â€¢ ${it.precio_unitario || 0} â€¢
+                  Cant: {it.cantidad} {it.unidad} • ${it.precio_unitario || 0} •
                   Estado: {it.estado_pieza_code}
                 </div>
               </div>
@@ -411,10 +411,10 @@ export default function SolicitudShow() {
                   title="Ver detalles"
                 >
                   <div className="font-medium">
-                    {p.clave_prod} â€¢ {p.desc_prod}
+                    {p.clave_prod} • {p.desc_prod}
                   </div>
                   <div className="text-sm text-slate-400">
-                    {p.uni_med} â€¢ Precio:{" "}
+                    {p.uni_med} • Precio:{" "}
                     {MXN_FORMAT.format(
                       toMXN(p.precio_venta ?? 0, p.moneda_precio || "1")
                     )}{" "}
@@ -445,15 +445,15 @@ export default function SolicitudShow() {
               <span className="font-medium text-slate-800">
                 {new Date(b.ts).toLocaleString()}
               </span>{" "}
-              â€¢ {b.accion}{" "}
+              • {b.accion}{" "}
               {b.de ? (
                 <span className="text-blue-700 font-medium">
-                  ({b.de} â†’ {b.a})
+                  ({b.de} → {b.a})
                 </span>
               ) : null}{" "}
-              {b.nota ? `â€¢ ${b.nota}` : ""}{" "}
+              {b.nota ? `• ${b.nota}` : ""}{" "}
               {b.actor && (
-                <span className="text-slate-500">â€¢ {b.actor}</span>
+                <span className="text-slate-500">• {b.actor}</span>
               )}
             </div>
           ))
@@ -521,7 +521,7 @@ function PiezaDrawer({
           <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-white">
             <div>
               <div className="text-sm font-semibold text-slate-800">
-                {pieza?.clave_prod || "â€”"}
+                {pieza?.clave_prod || "—"}
               </div>
               <div className="text-xs text-slate-500">
                 {pieza?.desc_prod || ""}
@@ -634,7 +634,7 @@ function PiezaDrawer({
                     <div className="ml-auto text-sm">
                       Total:{" "}
                       <span className="font-semibold">
-                        {qtyValid ? MXN_FORMAT.format(totalPreviewMXN) : "â€”"}
+                        {qtyValid ? MXN_FORMAT.format(totalPreviewMXN) : "—"}
                       </span>
                     </div>
 
@@ -672,7 +672,7 @@ function Spec({ label, value }) {
         {label}
       </div>
       <div className="text-sm font-medium break-words">
-        {value || "â€”"}
+        {value || "—"}
       </div>
     </div>
   );
