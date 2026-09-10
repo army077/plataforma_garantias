@@ -454,92 +454,117 @@ export default function AlmacenPage() {
     return (
         <div className="space-y-5">
 
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                <div>
-                    <h2 className="text-xl font-semibold text-slate-900 tracking-tight">Solicitudes de Almacén</h2>
-                    <p className="text-sm text-slate-500 mt-0.5">Gestión de movimientos y entregas</p>
-                </div>
+            <div className="space-y-3">
 
-                <div className="flex items-center gap-2 flex-wrap">
+                {/* FILA 1: título + buscador + acciones de administración */}
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                    <div>
+                        <h2 className="text-xl font-semibold text-slate-900 tracking-tight">Solicitudes de Almacén</h2>
+                    </div>
 
-                    {role === "admin" && (
-                        <button
-                            className="btn"
-                            onClick={() => navigate("/almacen/usuarios")}
-                        >
-                            Usuarios
-                        </button>
-                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
 
-                    <div className="relative w-56">
-                        <label htmlFor="op-search-input" className="sr-only">
-                            Buscar o escanear OP
-                        </label>
-                        <div className="relative">
-                            <input
-                                id="op-search-input"
-                                type="text"
-                                role="combobox"
-                                aria-expanded={mostrarSugerenciasOP && sugerenciasOP.length > 0}
-                                aria-controls="op-search-listbox"
-                                aria-autocomplete="list"
-                                autoComplete="off"
-                                autoFocus
-                                className="input w-full pr-8"
-                                placeholder="Buscar o escanear OP"
-                                value={opSearchText}
-                                onChange={(e) => {
-                                    setOpSearchText(e.target.value);
-                                    setMostrarSugerenciasOP(true);
-                                    setIndiceSugerenciaActiva(-1);
-                                }}
-                                onFocus={() => {
-                                    if (opSearchText.trim() !== "") setMostrarSugerenciasOP(true);
-                                }}
-                                onBlur={() => {
-                                    setTimeout(() => setMostrarSugerenciasOP(false), 100);
-                                }}
-                                onKeyDown={handleOpSearchKeyDown}
-                            />
-                            {(opSearchText || filtroOrden) && (
-                                <button
-                                    type="button"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={limpiarFiltroOP}
-                                    className="absolute inset-y-0 right-2 flex items-center text-slate-400 hover:text-slate-700"
-                                    title="Limpiar búsqueda de OP"
-                                    aria-label="Limpiar búsqueda de OP"
+                        <div className="relative w-56">
+                            <label htmlFor="op-search-input" className="sr-only">
+                                Buscar o escanear OP
+                            </label>
+                            <div className="relative">
+                                <input
+                                    id="op-search-input"
+                                    type="text"
+                                    role="combobox"
+                                    aria-expanded={mostrarSugerenciasOP && sugerenciasOP.length > 0}
+                                    aria-controls="op-search-listbox"
+                                    aria-autocomplete="list"
+                                    autoComplete="off"
+                                    autoFocus
+                                    className="input w-full pr-8"
+                                    placeholder="Buscar o escanear OP"
+                                    value={opSearchText}
+                                    onChange={(e) => {
+                                        setOpSearchText(e.target.value);
+                                        setMostrarSugerenciasOP(true);
+                                        setIndiceSugerenciaActiva(-1);
+                                    }}
+                                    onFocus={() => {
+                                        if (opSearchText.trim() !== "") setMostrarSugerenciasOP(true);
+                                    }}
+                                    onBlur={() => {
+                                        setTimeout(() => setMostrarSugerenciasOP(false), 100);
+                                    }}
+                                    onKeyDown={handleOpSearchKeyDown}
+                                />
+                                {(opSearchText || filtroOrden) && (
+                                    <button
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={limpiarFiltroOP}
+                                        className="absolute inset-y-0 right-2 flex items-center text-slate-400 hover:text-slate-700"
+                                        title="Limpiar búsqueda de OP"
+                                        aria-label="Limpiar búsqueda de OP"
+                                    >
+                                        ×
+                                    </button>
+                                )}
+                            </div>
+
+                            {mostrarSugerenciasOP && sugerenciasOP.length > 0 && (
+                                <ul
+                                    id="op-search-listbox"
+                                    role="listbox"
+                                    className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg text-sm"
                                 >
-                                    ×
-                                </button>
+                                    {sugerenciasOP.map((op, idx) => (
+                                        <li
+                                            key={op}
+                                            role="option"
+                                            aria-selected={idx === indiceSugerenciaActiva}
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => aplicarFiltroOP(op)}
+                                            className={`px-3 py-2 cursor-pointer ${
+                                                idx === indiceSugerenciaActiva
+                                                    ? "bg-blue-50 text-blue-700"
+                                                    : "hover:bg-slate-50 text-slate-700"
+                                            }`}
+                                        >
+                                            {formatearOP(op)}
+                                        </li>
+                                    ))}
+                                </ul>
                             )}
                         </div>
 
-                        {mostrarSugerenciasOP && sugerenciasOP.length > 0 && (
-                            <ul
-                                id="op-search-listbox"
-                                role="listbox"
-                                className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg text-sm"
+                        {role === "admin" && (
+                            <button
+                                className="btn"
+                                onClick={() => navigate("/almacen/usuarios")}
                             >
-                                {sugerenciasOP.map((op, idx) => (
-                                    <li
-                                        key={op}
-                                        role="option"
-                                        aria-selected={idx === indiceSugerenciaActiva}
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={() => aplicarFiltroOP(op)}
-                                        className={`px-3 py-2 cursor-pointer ${
-                                            idx === indiceSugerenciaActiva
-                                                ? "bg-blue-50 text-blue-700"
-                                                : "hover:bg-slate-50 text-slate-700"
-                                        }`}
-                                    >
-                                        {formatearOP(op)}
-                                    </li>
-                                ))}
-                            </ul>
+                                Usuarios
+                            </button>
                         )}
+
+                        <button
+                            className="btn btn-primary"
+                            onClick={() => setDrawerOpen(true)}
+                        >
+                            Nueva solicitud
+                        </button>
+
+                        {(role === "admin" || role === "supervisor") && (
+                            <button
+                                className="btn btn-danger"
+                                onClick={() => setCerrarModalOpen(true)}
+                            >
+                                Cerrar solicitud
+                            </button>
+                        )}
+
                     </div>
+                </div>
+
+                {/* FILA 2: filtros de movimiento */}
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                    <p className="text-sm text-slate-500">Gestión de movimientos y entregas</p>
 
                     <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Filtrar por movimiento">
                         <button
@@ -583,24 +608,8 @@ export default function AlmacenPage() {
                             🟢 Cargado (SAI)
                         </button>
                     </div>
-
-                    <button
-                        className="btn btn-primary"
-                        onClick={() => setDrawerOpen(true)}
-                    >
-                        Nueva solicitud
-                    </button>
-
-                    {(role === "admin" || role === "supervisor") && (
-                        <button
-                            className="btn btn-danger"
-                            onClick={() => setCerrarModalOpen(true)}
-                        >
-                            Cerrar solicitud
-                        </button>
-                    )}
-
                 </div>
+
             </div>
 
             <div className="card p-0 overflow-x-auto">
