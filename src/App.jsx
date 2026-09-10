@@ -13,7 +13,7 @@ import UsuariosAlmacenPage from "./pages/UsuariosAlmacenPage.jsx";
 import RegistroAlmacen from "./pages/RegistroAlmacen.jsx";
 
 const ROLES_GARANTIAS = ["garantias", "admin"];
-const ROLES_REGISTRO_ALMACEN = ["garantias", "admin", "almacen", "supervisor"];
+const ROLES_REGISTRO_ALMACEN = ["garantias", "admin", "almacen", "supervisor", "solicitante"];
 
 
 function Private({ children, roles }) {

@@ -643,7 +643,7 @@ export default function AlmacenPage() {
                                 <th className="px-4 py-3 text-center">Cant</th>
                                 <th className="px-4 py-3 text-center">Estatus</th>
                                 <th className="px-4 py-3 text-center">
-                                    {(role === "admin" || role === "almacen") && "Movimiento"}
+                                    {(role === "admin" || role === "almacen" || role === "solicitante") && "Movimiento"}
                                 </th>
                                 <th className="px-4 py-3 text-center">
                                     {(role === "admin" || role === "almacen") && "Acciones"}
@@ -691,7 +691,7 @@ export default function AlmacenPage() {
                                     </td>
 
                                     <td className="px-4 py-3">
-                                        {(role === "admin" || role === "almacen") && (
+                                        {(role === "admin" || role === "almacen" || role === "solicitante") && (
                                             loadingStatusId === r.id ? (
                                                 <div className="flex items-center gap-2 text-xs text-slate-500">
                                                     <svg
@@ -721,9 +721,11 @@ export default function AlmacenPage() {
                                                         e.stopPropagation();
                                                         const nuevo = e.target.value;
                                                         const anterior = r.estatus_movimiento;
+                                                        // solicitante: cualquier cambio de estatus debe pasar por PIN
                                                         const requierePin =
-                                                            anterior === "SIN ENTREGAR" &&
-                                                            (nuevo === "ENTREGADO" || nuevo === "CARGADO");
+                                                            role === "solicitante" ||
+                                                            (anterior === "SIN ENTREGAR" &&
+                                                                (nuevo === "ENTREGADO" || nuevo === "CARGADO"));
                                                         if (requierePin) {
                                                             setMovimientoSeleccionado(r);
                                                             setNuevoStatus(nuevo);

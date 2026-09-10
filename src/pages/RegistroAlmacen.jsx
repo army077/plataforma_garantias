@@ -1,7 +1,7 @@
 // src/pages/RegistroAlmacen.jsx
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createAlmacenMovimiento, listAlmacenMovimientos } from "../lib/api.js";
+import { createAlmacenMovimiento, listAlmacenMovimientos, listOrdenesCerradas } from "../lib/api.js";
 import { useAuth } from "../auth/AuthProvider.jsx";
 
 // Normaliza valores como "OP3889", "op3889" o "3889" al formato puro del backend: "3889"
@@ -33,6 +33,10 @@ export default function RegistroAlmacen() {
   // Caché local (no persistente) de OPs marcadas como cerradas por el backend (409 OP_CERRADA)
   const [opsCerradas, setOpsCerradas] = useState(() => new Set());
 
+  // Selector visible de OP existentes (buscador tipo combobox)
+  const [opSelectorTexto, setOpSelectorTexto] = useState("");
+  const [mostrarListaOP, setMostrarListaOP] = useState(false);
+
   const inputRef = useRef(null);
   const cantidadInputRef = useRef(null);
   const toastTimeoutRef = useRef(null);
@@ -43,6 +47,7 @@ export default function RegistroAlmacen() {
   }, []);
 
   // Consulta React Query para obtener movimientos reales de Almacén
+  // Se carga siempre (no solo con OP activa) porque de aquí se derivan las OP existentes
   const {
     data: movimientosBackend = [],
     isLoading: isLoadingMovimientos,
@@ -51,9 +56,47 @@ export default function RegistroAlmacen() {
   } = useQuery({
     queryKey: ["almacen_movimientos"],
     queryFn: listAlmacenMovimientos,
-    enabled: Boolean(opActiva),
     staleTime: 1000 * 5, // 5 segundos
   });
+
+  // Consulta React Query para conocer proactivamente las OP cerradas (fuente de verdad: backend)
+  const { data: ordenesCerradasBackend = [] } = useQuery({
+    queryKey: ["almacen_ordenes_cerradas"],
+    queryFn: listOrdenesCerradas,
+    staleTime: 1000 * 5,
+  });
+
+  // OP existentes: únicamente las que ya tienen movimientos registrados en backend
+  const ordenesExistentes = useMemo(() => {
+    return new Set(
+      (movimientosBackend || [])
+        .map((m) => normalizarOrdenProduccion(m.orden_produccion))
+        .filter(Boolean)
+    );
+  }, [movimientosBackend]);
+
+  // OP cerradas conocidas de forma proactiva (independiente del 409 reactivo)
+  const ordenesCerradasSet = useMemo(() => {
+    return new Set(
+      (ordenesCerradasBackend || [])
+        .map((c) => normalizarOrdenProduccion(c.orden_produccion))
+        .filter(Boolean)
+    );
+  }, [ordenesCerradasBackend]);
+
+  // OP existentes y abiertas: únicas seleccionables desde el selector visible
+  const ordenesDisponibles = useMemo(() => {
+    return Array.from(ordenesExistentes)
+      .filter((op) => !ordenesCerradasSet.has(op))
+      .sort();
+  }, [ordenesExistentes, ordenesCerradasSet]);
+
+  // Filtrado en vivo del selector visible según el texto escrito
+  const opsFiltradasSelector = useMemo(() => {
+    const norm = normalizarOrdenProduccion(opSelectorTexto);
+    if (!norm) return ordenesDisponibles;
+    return ordenesDisponibles.filter((op) => op.includes(norm));
+  }, [ordenesDisponibles, opSelectorTexto]);
 
   // Al existir una pieza pendiente, enfocar automáticamente el input de cantidad y seleccionar el texto
   useEffect(() => {
@@ -138,6 +181,66 @@ export default function RegistroAlmacen() {
     },
   });
 
+  // Valida una OP contra las existentes/abiertas en backend antes de activarla.
+  // Nunca crea una OP: si no existe o está cerrada, rechaza localmente sin llamar al servidor.
+  const activarOP = (valorCrudo) => {
+    const opLimpia = normalizarOrdenProduccion(valorCrudo);
+    if (!opLimpia) return;
+    const opVisual = `OP${opLimpia}`;
+    const ahora = new Date();
+
+    if (!ordenesExistentes.has(opLimpia)) {
+      showToast(`La OP ${opLimpia} no existe. Créala primero desde Nueva solicitud.`, "error");
+      setHistorialEscaneos((prev) => [
+        {
+          id: crypto.randomUUID ? crypto.randomUUID() : `scan-${Date.now()}-${Math.random()}`,
+          codigo: opVisual,
+          tipo: "OP",
+          op: opLimpia,
+          timestamp: ahora,
+          status: "error",
+          errorMsg: "OP inexistente",
+        },
+        ...prev,
+      ]);
+      return;
+    }
+
+    if (ordenesCerradasSet.has(opLimpia) || opsCerradas.has(opLimpia)) {
+      showToast(`La OP ${opLimpia} está cerrada y no admite nuevos registros.`, "error");
+      setOpsCerradas((prev) => new Set(prev).add(opLimpia));
+      setHistorialEscaneos((prev) => [
+        {
+          id: crypto.randomUUID ? crypto.randomUUID() : `scan-${Date.now()}-${Math.random()}`,
+          codigo: opVisual,
+          tipo: "OP",
+          op: opLimpia,
+          timestamp: ahora,
+          status: "error",
+          errorMsg: "OP cerrada",
+        },
+        ...prev,
+      ]);
+      return;
+    }
+
+    setOpActiva(opVisual);
+    setPiezaPendiente("");
+    setCantidadInput("1");
+
+    const nuevoRegistro = {
+      id: crypto.randomUUID ? crypto.randomUUID() : `scan-${Date.now()}-${Math.random()}`,
+      codigo: opVisual,
+      tipo: "OP",
+      op: opLimpia,
+      timestamp: ahora,
+      status: "completado",
+    };
+
+    setHistorialEscaneos((prev) => [nuevoRegistro, ...prev]);
+    showToast(`OP Activa establecida: ${opVisual}`, "info");
+  };
+
   // Procesamiento de lectura de escáner
   const procesarCodigo = (raw) => {
     const code = raw.trim();
@@ -147,24 +250,7 @@ export default function RegistroAlmacen() {
 
     // 1. Detección de Orden de Producción (comienza con "OP", case-insensitive)
     if (code.toUpperCase().startsWith("OP")) {
-      const opLimpia = normalizarOrdenProduccion(code);
-      const opVisual = `OP${opLimpia}`;
-
-      setOpActiva(opVisual);
-      setPiezaPendiente("");
-      setCantidadInput("1");
-
-      const nuevoRegistro = {
-        id: crypto.randomUUID ? crypto.randomUUID() : `scan-${Date.now()}-${Math.random()}`,
-        codigo: opVisual,
-        tipo: "OP",
-        op: opLimpia,
-        timestamp: ahora,
-        status: "completado",
-      };
-
-      setHistorialEscaneos((prev) => [nuevoRegistro, ...prev]);
-      showToast(`OP Activa establecida: ${opVisual}`, "info");
+      activarOP(code);
       return;
     }
 
@@ -403,7 +489,11 @@ export default function RegistroAlmacen() {
   const totalSkusOpActiva = tarjetaOpActiva ? tarjetaOpActiva.piezas.length : 0;
 
   // OP activa marcada como cerrada por el backend (409 OP_CERRADA) en esta sesión
-  const opCerrada = Boolean(opActiva) && opsCerradas.has(normalizarOrdenProduccion(opActiva));
+  // OP activa marcada como cerrada, ya sea proactivamente (backend) o reactivamente (409 OP_CERRADA)
+  const opCerrada =
+    Boolean(opActiva) &&
+    (opsCerradas.has(normalizarOrdenProduccion(opActiva)) ||
+      ordenesCerradasSet.has(normalizarOrdenProduccion(opActiva)));
 
   return (
     <div className="space-y-6">
@@ -539,6 +629,56 @@ export default function RegistroAlmacen() {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* ─── SELECTOR VISIBLE DE OP EXISTENTES (abiertas) ─── */}
+        <div className="mb-6 relative">
+          <label htmlFor="op-selector-input" className="block text-xs font-bold uppercase tracking-wider text-amber-400 mb-2 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400" />
+            Seleccionar OP existente
+          </label>
+          <div className="relative">
+            <input
+              id="op-selector-input"
+              type="text"
+              autoComplete="off"
+              disabled={Boolean(piezaPendiente)}
+              value={opSelectorTexto}
+              onChange={(e) => {
+                setOpSelectorTexto(e.target.value);
+                setMostrarListaOP(true);
+              }}
+              onFocus={() => setMostrarListaOP(true)}
+              onBlur={() => setTimeout(() => setMostrarListaOP(false), 100)}
+              placeholder="Buscar OP existente y abierta (ej. 3889)…"
+              className="w-full rounded-xl bg-slate-950 border-2 border-slate-800 focus:border-amber-500/70 px-4 py-2.5 text-sm font-mono text-amber-200 placeholder-slate-600 outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            {mostrarListaOP && (
+              <ul className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 shadow-2xl text-sm divide-y divide-slate-900">
+                {opsFiltradasSelector.length === 0 ? (
+                  <li className="px-4 py-2.5 text-slate-500">No hay OP abiertas que coincidan</li>
+                ) : (
+                  opsFiltradasSelector.map((op) => (
+                    <li
+                      key={op}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        activarOP(op);
+                        setOpSelectorTexto("");
+                        setMostrarListaOP(false);
+                      }}
+                      className="px-4 py-2.5 cursor-pointer text-amber-200 hover:bg-amber-500/10 font-mono"
+                    >
+                      {formatearOpVisual(op)}
+                    </li>
+                  ))
+                )}
+              </ul>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-500 mt-1.5">
+            Solo se listan OP existentes y abiertas. Para iniciar una OP nueva usa "Nueva solicitud" en Movimientos.
+          </p>
         </div>
 
         {/* ─── BANNER VISUAL DE PIEZA PENDIENTE ─── */}
