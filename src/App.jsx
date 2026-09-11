@@ -207,7 +207,7 @@ function Sidebar({ onClose, collapsed, setCollapsed }) {
             <NavItem icon={<IcoBarcode />} label="Registro" active={isActive("/almacen/registro")} onClick={() => go("/almacen/registro")} collapsed={collapsed} />
           )}
           {esAdmin && (
-            <NavItem icon={<IcoUsers />} label="Usuarios PIN" active={isActive("/almacen/usuarios")} onClick={() => go("/almacen/usuarios")} collapsed={collapsed} />
+            <NavItem icon={<IcoUsers />} label="Responsables" active={isActive("/almacen/usuarios")} onClick={() => go("/almacen/usuarios")} collapsed={collapsed} />
           )}
         </NavSection>
 
