@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
     listAlmacenMovimientos,
     createAlmacenMovimiento,
-    createAlmacenMovimientoPin,
+    getUsuariosAlmacen,
     buscarProductoAlmacen,
     atenderAlmacenMovimiento,
     atenderAlmacenMovimientoPin,
@@ -22,6 +22,16 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import LockIcon from "@mui/icons-material/Lock";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
+
+const PERSONA_POR_ASIGNAR = "Por asignar";
+
+function normalizarTexto(str) {
+    return (str || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim();
+}
 
 // Normaliza "OP3889", "op3889" o "3889" a la forma pura "3889" para comparar OPs
 function normalizarOP(value) {
@@ -102,11 +112,20 @@ export default function AlmacenPage() {
 
     // --- Datos generales ---
     const [formHeader, setFormHeader] = useState({
-        pin: "",
         estacion: "",
         orden_produccion: "",
         concepto_liberacion: ""
     });
+
+    // --- Catálogo y combobox de responsables (Fase 2) ---
+    const [listaResponsables, setListaResponsables] = useState([]);
+    const [responsablesLoading, setResponsablesLoading] = useState(false);
+    const [responsablesError, setResponsablesError] = useState(null);
+
+    const [responsableTexto, setResponsableTexto] = useState("");
+    const [responsableSeleccionado, setResponsableSeleccionado] = useState(null);
+    const [mostrarSugerenciasResp, setMostrarSugerenciasResp] = useState(false);
+    const [indiceSugerenciaResp, setIndiceSugerenciaResp] = useState(-1);
 
     // --- Pieza actual ---
     const [currentPart, setCurrentPart] = useState({
@@ -117,6 +136,25 @@ export default function AlmacenPage() {
 
     // --- Lista acumulada de piezas ---
     const [listaPiezas, setListaPiezas] = useState([]);
+
+    const cargarResponsables = async () => {
+        setResponsablesLoading(true);
+        setResponsablesError(null);
+        try {
+            const data = await getUsuariosAlmacen();
+            setListaResponsables(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error("Error al obtener usuarios_almacen:", err);
+            const status = err?.response?.status;
+            if (status === 401 || status === 403) {
+                setResponsablesError(`No cuentas con permisos para consultar el catálogo de responsables (HTTP ${status}).`);
+            } else {
+                setResponsablesError("No se pudo cargar el catálogo de responsables. Revisa la conexión.");
+            }
+        } finally {
+            setResponsablesLoading(false);
+        }
+    };
 
     const load = async () => {
         const [data, cerradas] = await Promise.all([
@@ -143,6 +181,97 @@ export default function AlmacenPage() {
         () => ordenesUnicas.filter(op => !ordenesCerradas.has(String(op || "").trim())),
         [ordenesUnicas, ordenesCerradas]
     );
+
+    const responsablesActivos = useMemo(() => {
+        return listaResponsables.filter(u => u.activo !== 0 && u.activo !== false);
+    }, [listaResponsables]);
+
+    const sugerenciasResponsable = useMemo(() => {
+        const opcionPorAsignar = {
+            id: null,
+            nombre: PERSONA_POR_ASIGNAR,
+            esPorAsignar: true
+        };
+
+        const queryNorm = normalizarTexto(responsableTexto);
+        const esSeleccionActual = responsableSeleccionado && normalizarTexto(responsableSeleccionado.nombre) === queryNorm;
+
+        const filtrados = (queryNorm && !esSeleccionActual)
+            ? responsablesActivos.filter(r => normalizarTexto(r.nombre).includes(queryNorm))
+            : responsablesActivos;
+
+        return [opcionPorAsignar, ...filtrados];
+    }, [responsablesActivos, responsableTexto, responsableSeleccionado]);
+
+    const seleccionarResponsable = (opcion) => {
+        if (!opcion) return;
+        setResponsableSeleccionado(opcion);
+        setResponsableTexto(opcion.nombre);
+        setMostrarSugerenciasResp(false);
+        setIndiceSugerenciaResp(-1);
+    };
+
+    const limpiarResponsable = () => {
+        setResponsableSeleccionado(null);
+        setResponsableTexto("");
+        setMostrarSugerenciasResp(false);
+        setIndiceSugerenciaResp(-1);
+    };
+
+    const handleResponsableKeyDown = (e) => {
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            if (sugerenciasResponsable.length === 0) return;
+            setMostrarSugerenciasResp(true);
+            setIndiceSugerenciaResp((prev) => (prev + 1) % sugerenciasResponsable.length);
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            if (sugerenciasResponsable.length === 0) return;
+            setMostrarSugerenciasResp(true);
+            setIndiceSugerenciaResp((prev) => (prev - 1 + sugerenciasResponsable.length) % sugerenciasResponsable.length);
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            if (mostrarSugerenciasResp && indiceSugerenciaResp >= 0 && sugerenciasResponsable[indiceSugerenciaResp]) {
+                seleccionarResponsable(sugerenciasResponsable[indiceSugerenciaResp]);
+            } else if (sugerenciasResponsable.length > 0 && mostrarSugerenciasResp) {
+                const coincidencia = sugerenciasResponsable.find(
+                    s => normalizarTexto(s.nombre) === normalizarTexto(responsableTexto)
+                );
+                if (coincidencia) {
+                    seleccionarResponsable(coincidencia);
+                }
+            }
+        } else if (e.key === "Escape") {
+            e.preventDefault();
+            setMostrarSugerenciasResp(false);
+            setIndiceSugerenciaResp(-1);
+        }
+    };
+
+    const resetFormNuevaSolicitud = () => {
+        setResponsableSeleccionado(null);
+        setResponsableTexto("");
+        setMostrarSugerenciasResp(false);
+        setIndiceSugerenciaResp(-1);
+        setFormHeader({
+            estacion: "",
+            orden_produccion: "",
+            concepto_liberacion: ""
+        });
+        setCurrentPart({
+            numero_parte: "",
+            descripcion: "",
+            cantidad: 1
+        });
+        setListaPiezas([]);
+        setSearch("");
+        setProductos([]);
+    };
+
+    const cerrarDrawer = () => {
+        resetFormNuevaSolicitud();
+        setDrawerOpen(false);
+    };
 
     const handleBuscarProd = async (q) => {
         if (!q.trim()) return setProductos([]);
@@ -173,6 +302,7 @@ export default function AlmacenPage() {
 
     useEffect(() => {
         load(); // carga inicial
+        cargarResponsables(); // carga inicial de responsables
 
         const interval = setInterval(() => {
             load(); // refresco cada 10s
@@ -206,7 +336,12 @@ export default function AlmacenPage() {
     };
 
     const handleCrearTodo = async () => {
-        if (!formHeader.pin || !formHeader.estacion || !formHeader.orden_produccion) {
+        if (!responsableSeleccionado || normalizarTexto(responsableTexto) !== normalizarTexto(responsableSeleccionado.nombre)) {
+            alert("Debes seleccionar un Responsable / Operador del catálogo o elegir 'Por asignar'.");
+            return;
+        }
+
+        if (!formHeader.estacion || !formHeader.orden_produccion) {
             alert("Completa Persona, Estación y Orden.");
             return;
         }
@@ -223,21 +358,24 @@ export default function AlmacenPage() {
             return;
         }
 
+        const nombrePersona = responsableSeleccionado.esPorAsignar
+            ? PERSONA_POR_ASIGNAR
+            : responsableSeleccionado.nombre;
+
         try {
             for (const pieza of listaPiezas) {
-                await createAlmacenMovimientoPin({
-                    ...formHeader,
-                    ...pieza
+                await createAlmacenMovimiento({
+                    persona: nombrePersona,
+                    estacion: formHeader.estacion,
+                    orden_produccion: formHeader.orden_produccion,
+                    concepto_liberacion: formHeader.concepto_liberacion,
+                    numero_parte: pieza.numero_parte,
+                    descripcion: pieza.descripcion,
+                    cantidad: pieza.cantidad
                 });
             }
 
-            setFormHeader({
-                pin: "",
-                estacion: "",
-                orden_produccion: "",
-                concepto_liberacion: ""
-            });
-            setListaPiezas([]);
+            resetFormNuevaSolicitud();
             setDrawerOpen(false);
 
             load();
@@ -348,8 +486,12 @@ export default function AlmacenPage() {
             concepto_liberacion: ""
         });
 
+        setResponsableSeleccionado(null);
+        setResponsableTexto("");
+        setMostrarSugerenciasResp(false);
+        setIndiceSugerenciaResp(-1);
+
         setFormHeader({
-            pin: "",
             estacion: "",
             orden_produccion: "",
             concepto_liberacion: ""
@@ -545,7 +687,12 @@ export default function AlmacenPage() {
 
                         <button
                             className="btn btn-primary"
-                            onClick={() => setDrawerOpen(true)}
+                            onClick={() => {
+                                if (listaResponsables.length === 0 && !responsablesLoading) {
+                                    cargarResponsables();
+                                }
+                                setDrawerOpen(true);
+                            }}
                         >
                             Nueva solicitud
                         </button>
@@ -890,7 +1037,7 @@ export default function AlmacenPage() {
                     {/* FONDO OSCURO */}
                     <div
                         className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-40"
-                        onClick={() => setDrawerOpen(false)}
+                        onClick={cerrarDrawer}
                     />
 
                     {/* DRAWER */}
@@ -907,7 +1054,7 @@ export default function AlmacenPage() {
                             </h3>
                             <button
                                 className="btn"
-                                onClick={() => setDrawerOpen(false)}
+                                onClick={cerrarDrawer}
                             >
                                 Cerrar
                             </button>
@@ -922,23 +1069,165 @@ export default function AlmacenPage() {
                                     Datos Generales
                                 </h4>
 
-                                {/* SOLICITANTE POR PIN */}
-                                <div className="p-4 rounded-lg border border-blue-100 bg-blue-50/50">
-                                    <label className="block text-xs font-semibold text-blue-600 uppercase mb-1">
-                                        Solicitante (Responsable)
-                                    </label>
+                                {/* RESPONSABLE / OPERADOR (COMBOBOX) */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                                            Responsable / Operador
+                                        </label>
+                                        {responsablesLoading && (
+                                            <span className="text-[11px] text-slate-400">Cargando catálogo…</span>
+                                        )}
+                                    </div>
 
-                                    <input
-                                        className="input border-blue-200 focus:border-blue-500"
-                                        placeholder="Ingresa tu PIN"
-                                        value={formHeader.pin}
-                                        onChange={e => setFormHeader({ ...formHeader, pin: e.target.value })}
-                                        type="text"
-                                    />
+                                    {/* Si hay error al cargar responsables */}
+                                    {responsablesError ? (
+                                        <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-2">
+                                            <p>{responsablesError}</p>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={cargarResponsables}
+                                                    className="btn text-xs px-2.5 py-1 bg-white border-amber-300 text-amber-900 hover:bg-amber-100"
+                                                >
+                                                    Reintentar
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => seleccionarResponsable({ id: null, nombre: PERSONA_POR_ASIGNAR, esPorAsignar: true })}
+                                                    className="text-xs font-medium text-amber-700 underline hover:text-amber-900 ml-1"
+                                                >
+                                                    Usar "{PERSONA_POR_ASIGNAR}"
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                role="combobox"
+                                                aria-expanded={mostrarSugerenciasResp && sugerenciasResponsable.length > 0}
+                                                aria-autocomplete="list"
+                                                autoComplete="off"
+                                                disabled={responsablesLoading}
+                                                className={`input w-full pr-8 ${
+                                                    responsableSeleccionado?.esPorAsignar
+                                                        ? "border-amber-300 bg-amber-50/40 text-amber-900 font-medium"
+                                                        : responsableSeleccionado
+                                                        ? "border-emerald-300 bg-emerald-50/20 text-slate-900 font-medium"
+                                                        : ""
+                                                }`}
+                                                placeholder="Buscar responsable u operador…"
+                                                value={responsableTexto}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setResponsableTexto(val);
+                                                    setMostrarSugerenciasResp(true);
+                                                    setIndiceSugerenciaResp(-1);
+                                                    if (responsableSeleccionado && val !== responsableSeleccionado.nombre) {
+                                                        setResponsableSeleccionado(null);
+                                                    }
+                                                }}
+                                                onFocus={() => {
+                                                    setMostrarSugerenciasResp(true);
+                                                }}
+                                                onBlur={() => {
+                                                    setTimeout(() => {
+                                                        setMostrarSugerenciasResp(false);
+                                                    }, 150);
+                                                }}
+                                                onKeyDown={handleResponsableKeyDown}
+                                            />
 
-                                    <p className="text-xs text-blue-500 mt-1.5">
-                                        Ingresa tu PIN personal asignado por almacén.
-                                    </p>
+                                            {responsableTexto && (
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={limpiarResponsable}
+                                                    className="absolute inset-y-0 right-2 flex items-center text-slate-400 hover:text-slate-700 text-lg leading-none"
+                                                    title="Limpiar selección"
+                                                    aria-label="Limpiar selección"
+                                                >
+                                                    ×
+                                                </button>
+                                            )}
+
+                                            {/* Panel de sugerencias */}
+                                            {mostrarSugerenciasResp && sugerenciasResponsable.length > 0 && (
+                                                <ul
+                                                    role="listbox"
+                                                    className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl text-sm divide-y divide-slate-100"
+                                                >
+                                                    {sugerenciasResponsable.map((opt, idx) => {
+                                                        const esActivo = idx === indiceSugerenciaResp;
+                                                        const esSeleccionado = responsableSeleccionado?.nombre === opt.nombre;
+
+                                                        if (opt.esPorAsignar) {
+                                                            return (
+                                                                <li
+                                                                    key="__por_asignar__"
+                                                                    role="option"
+                                                                    aria-selected={esSeleccionado}
+                                                                    onMouseDown={(e) => e.preventDefault()}
+                                                                    onClick={() => seleccionarResponsable(opt)}
+                                                                    className={`px-3 py-2.5 cursor-pointer font-medium flex items-center gap-2 transition-colors ${
+                                                                        esActivo
+                                                                            ? "bg-amber-100 text-amber-900"
+                                                                            : "bg-amber-50/70 text-amber-800 hover:bg-amber-100/80"
+                                                                    }`}
+                                                                >
+                                                                    <span className="text-amber-600 font-bold">⚠</span>
+                                                                    <span>{PERSONA_POR_ASIGNAR}</span>
+                                                                    <span className="text-[11px] text-amber-600 font-normal ml-auto">
+                                                                        (Definir más tarde)
+                                                                    </span>
+                                                                </li>
+                                                            );
+                                                        }
+
+                                                        return (
+                                                            <li
+                                                                key={opt.id}
+                                                                role="option"
+                                                                aria-selected={esSeleccionado}
+                                                                onMouseDown={(e) => e.preventDefault()}
+                                                                onClick={() => seleccionarResponsable(opt)}
+                                                                className={`px-3 py-2 cursor-pointer flex items-center justify-between transition-colors ${
+                                                                    esActivo
+                                                                        ? "bg-blue-50 text-blue-700"
+                                                                        : "hover:bg-slate-50 text-slate-700"
+                                                                } ${esSeleccionado ? "font-semibold" : ""}`}
+                                                            >
+                                                                <span>{opt.nombre}</span>
+                                                                {opt.rol && (
+                                                                    <span className="text-[11px] text-slate-400">
+                                                                        {opt.rol}
+                                                                    </span>
+                                                                )}
+                                                            </li>
+                                                        );
+                                                    })}
+                                                </ul>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Mensaje de estado de selección */}
+                                    <div className="mt-1">
+                                        {responsableSeleccionado?.esPorAsignar ? (
+                                            <p className="text-xs text-amber-600 flex items-center gap-1 font-medium">
+                                                <span>⚠</span> Asignación pendiente: se creará la OP sin responsable asignado.
+                                            </p>
+                                        ) : responsableSeleccionado ? (
+                                            <p className="text-xs text-emerald-600 flex items-center gap-1">
+                                                <span>✓</span> Responsable asignado: <strong>{responsableSeleccionado.nombre}</strong>
+                                            </p>
+                                        ) : (
+                                            <p className="text-[11px] text-slate-400">
+                                                Selecciona del catálogo o elige <em>"⚠ {PERSONA_POR_ASIGNAR}"</em>.
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <input
