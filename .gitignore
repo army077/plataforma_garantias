@@ -24,4 +24,11 @@ dist-ssr
 *.sw?
 
 # Credentials / server context (not part of frontend repo history)
-context/
+context/*
+!context/api12/
+!context/db/
+context/api12/*
+!context/api12/routes/
+!context/api12/server.js
+!context/api12/db.js
+!context/api12/.env.example
