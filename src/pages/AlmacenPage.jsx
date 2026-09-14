@@ -5,9 +5,7 @@ import {
     getUsuariosAlmacen,
     buscarProductoAlmacen,
     atenderAlmacenMovimiento,
-    atenderAlmacenMovimientoPin,
     actualizarEstatusMovimiento,
-    cambiarStatusConPin,
     updateAlmacenMovimiento,
     deleteAlmacenMovimiento,
     cerrarMovimientosPorOrden,
@@ -72,13 +70,6 @@ export default function AlmacenPage() {
     const [mostrarSugerenciasOP, setMostrarSugerenciasOP] = useState(false);
     const [indiceSugerenciaActiva, setIndiceSugerenciaActiva] = useState(-1);
 
-    const [pinModalOpen, setPinModalOpen] = useState(false);
-    const [pinValue, setPinValue] = useState("");
-    const [movimientoSeleccionado, setMovimientoSeleccionado] = useState(null);
-
-    const [pinModalStatusOpen, setPinModalStatusOpen] = useState(false);
-    const [nuevoStatus, setNuevoStatus] = useState("");
-    const [pinStatusValue, setPinStatusValue] = useState("");
 
     //cerrar solicitud
     const [cerrarModalOpen, setCerrarModalOpen] = useState(false);
@@ -388,6 +379,25 @@ export default function AlmacenPage() {
         }
     };
 
+    // ---- Atender movimiento (sin PIN, con identidad de useAuth) ----
+    const handleAtender = async (movimiento) => {
+        const atendio = user?.name || user?.email;
+        if (!atendio) {
+            alert("No se pudo determinar la identidad del usuario autenticado.");
+            return;
+        }
+
+        try {
+            await atenderAlmacenMovimiento(movimiento.id, atendio);
+            await load();
+            alert("Movimiento atendido correctamente.");
+        } catch (err) {
+            console.error(err);
+            const msg = err?.response?.data?.error || "Error al atender el movimiento.";
+            alert(msg);
+        }
+    };
+
     // ---- Candado: alternar cerrar/abrir OP desde la fila ----
     const abrirToggleModal = (orden) => {
         const op = String(orden || "").trim();
@@ -457,17 +467,11 @@ export default function AlmacenPage() {
         // modales
         setCerrarModalOpen(false);
         setModalOpen(false);
-        setPinModalOpen(false);
-        setPinModalStatusOpen(false);
         setEditModalOpen(false);
 
         // valores de PIN / orden
         setPinCerrar("");
         setOrdenCerrar("");
-        setPinValue("");
-        setPinStatusValue("");
-        setNuevoStatus("");
-        setMovimientoSeleccionado(null);
         setDetalle(null);
 
         // drawer / formularios
@@ -868,17 +872,7 @@ export default function AlmacenPage() {
                                                         e.stopPropagation();
                                                         const nuevo = e.target.value;
                                                         const anterior = r.estatus_movimiento;
-                                                        // solicitante: cualquier cambio de estatus debe pasar por PIN
-                                                        const requierePin =
-                                                            role === "solicitante" ||
-                                                            (anterior === "SIN ENTREGAR" &&
-                                                                (nuevo === "ENTREGADO" || nuevo === "CARGADO"));
-                                                        if (requierePin) {
-                                                            setMovimientoSeleccionado(r);
-                                                            setNuevoStatus(nuevo);
-                                                            setPinModalStatusOpen(true);
-                                                            return;
-                                                        }
+
                                                         // Actualización optimista: reflejar el cambio localmente de inmediato
                                                         setRows(prev => prev.map(row =>
                                                             row.id === r.id ? { ...row, estatus_movimiento: nuevo } : row
@@ -988,8 +982,7 @@ export default function AlmacenPage() {
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            setMovimientoSeleccionado(r);
-                                                            setPinModalOpen(true);
+                                                            handleAtender(r);
                                                         }}
                                                         className="px-3 py-1 text-xs rounded-lg border border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 transition whitespace-nowrap"
                                                     >
@@ -1557,138 +1550,6 @@ export default function AlmacenPage() {
                 </>
             )}
 
-            {pinModalOpen && (
-                <>
-                    <div
-                        className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-40"
-                        onClick={() => setPinModalOpen(false)}
-                    />
-
-                    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-                        bg-white w-[90%] max-w-sm rounded-xl shadow-2xl p-6
-                        z-50 border border-slate-200">
-
-                        <div className="flex flex-col items-center text-center mb-4">
-                            <div className="p-3 bg-blue-50 rounded-full mb-3">
-                                <LockIcon className="text-blue-500" style={{ fontSize: 32 }} />
-                            </div>
-                            <h2 className="text-lg font-semibold text-slate-900">Confirmar Atención</h2>
-                            <p className="text-slate-500 text-sm mt-1">
-                                ¿Quién está atendiendo esta solicitud?
-                            </p>
-                        </div>
-
-                        <label className="text-xs font-semibold text-slate-500 uppercase">
-                            Firma / PIN / Nombre
-                        </label>
-
-                        <input
-                            className="input mt-1 mb-4"
-                            placeholder="Ingresa tu clave…"
-                            value={pinValue}
-                            onChange={(e) => setPinValue(e.target.value)}
-                        />
-
-                        <div className="flex justify-between mt-2">
-                            <button
-                                className="btn"
-                                onClick={() => {
-                                    setPinModalOpen(false);
-                                    setPinValue("");
-                                }}
-                            >
-                                Cancelar
-                            </button>
-
-                            <button
-                                className="btn btn-primary"
-                                onClick={async () => {
-                                    try {
-                                        await atenderAlmacenMovimientoPin(movimientoSeleccionado.id, pinValue);
-                                        setPinModalOpen(false);
-                                        setPinValue("");
-                                        load();
-                                        alert("Movimiento atendido correctamente.");
-                                    } catch (err) {
-                                        alert("PIN incorrecto " + err);
-                                    }
-                                }}
-                            >
-                                Confirmar
-                            </button>
-                        </div>
-                    </div>
-                </>
-            )}
-
-            {pinModalStatusOpen && (
-                <>
-                    <div
-                        className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-40"
-                        onClick={() => setPinModalStatusOpen(false)}
-                    />
-
-                    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-                        bg-white w-[90%] max-w-sm rounded-xl shadow-2xl p-6
-                        z-50 border border-slate-200">
-
-                        <div className="flex flex-col items-center text-center mb-4">
-                            <div className="p-3 bg-blue-50 rounded-full mb-3">
-                                <LockIcon className="text-blue-500" style={{ fontSize: 32 }} />
-                            </div>
-                            <h2 className="text-lg font-semibold text-slate-900">Confirmar Entrega</h2>
-                            <p className="text-slate-500 text-sm mt-1">
-                                ¿Quién está realizando este movimiento?
-                            </p>
-                        </div>
-
-                        <label className="text-xs font-semibold text-slate-500 uppercase">
-                            Firma / PIN / Nombre
-                        </label>
-
-                        <input
-                            className="input mt-1 mb-4"
-                            placeholder="Ingresa tu clave…"
-                            value={pinStatusValue}
-                            onChange={(e) => setPinStatusValue(e.target.value)}
-                        />
-
-                        <div className="flex justify-between mt-2">
-                            <button
-                                className="btn"
-                                onClick={() => {
-                                    setPinModalStatusOpen(false);
-                                    setPinStatusValue("");
-                                }}
-                            >
-                                Cancelar
-                            </button>
-
-                            <button
-                                className="btn btn-primary"
-                                onClick={async () => {
-                                    try {
-                                        await cambiarStatusConPin(
-                                            movimientoSeleccionado.id,
-                                            nuevoStatus,
-                                            pinStatusValue
-                                        );
-
-                                        setPinModalStatusOpen(false);
-                                        setPinStatusValue("");
-                                        load();
-                                        alert("Estatus actualizado correctamente.");
-                                    } catch (err) {
-                                        alert("PIN incorrecto" + err);
-                                    }
-                                }}
-                            >
-                                Confirmar
-                            </button>
-                        </div>
-                    </div>
-                </>
-            )}
 
             {cerrarModalOpen && (
                 <>
