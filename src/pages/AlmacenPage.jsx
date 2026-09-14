@@ -82,7 +82,6 @@ export default function AlmacenPage() {
     // Modal: alternar candado (cerrar/abrir OP) desde la fila
     const [toggleModalOpen, setToggleModalOpen] = useState(false);
     const [toggleOrden, setToggleOrden] = useState("");
-    const [togglePin, setTogglePin] = useState("");
     const [toggleProximoEstado, setToggleProximoEstado] = useState(""); // "CERRADA" | "ABIERTA"
 
     // ID de la fila cuyo select de Movimiento está guardando
@@ -404,19 +403,14 @@ export default function AlmacenPage() {
         if (!op) return;
         setToggleOrden(op);
         setToggleProximoEstado(esOrdenCerrada(op) ? "ABIERTA" : "CERRADA");
-        setTogglePin("");
         setToggleModalOpen(true);
     };
 
     const confirmarToggleOP = async () => {
-        if (!togglePin || !toggleOrden) {
-            alert("Debes ingresar PIN.");
-            return;
-        }
+        if (!toggleOrden) return;
         try {
-            await toggleOrdenProduccion(toggleOrden, togglePin);
+            await toggleOrdenProduccion(toggleOrden);
             setToggleModalOpen(false);
-            setTogglePin("");
             setToggleOrden("");
             await load();
         } catch (err) {
@@ -777,7 +771,7 @@ export default function AlmacenPage() {
                     </span>
                     {(role === "admin" || role === "supervisor" || role === "almacen") && (
                         <span className="text-slate-500">
-                            &middot; Haz clic en el candado para alternar (requiere PIN)
+                            &middot; Haz clic en el candado para alternar
                         </span>
                     )}
                 </div>
@@ -935,7 +929,7 @@ export default function AlmacenPage() {
                                                 {/* CANDADO OP */}
                                                 {(() => {
                                                     const cerrada = esOrdenCerrada(r.orden_produccion);
-                                                    const puedeAlternar = role === "admin" || role === "supervisor" || role === "almacen";
+                                                    const puedeAlternar = role === "admin" || role === "almacen";
 
                                                     // Para cerrar: verificar que TODOS los movimientos de esta OP estén en CARGADO
                                                     const lineasDeOp = rows.filter(
@@ -1649,32 +1643,20 @@ export default function AlmacenPage() {
                                     : <LockOpenIcon className="text-emerald-600" />}
                             </div>
                             <h2 className="text-lg font-semibold text-slate-900">
-                                {toggleProximoEstado === "CERRADA" ? "Cerrar OP" : "Reabrir OP"} {toggleOrden}
+                                ¿{toggleProximoEstado === "CERRADA" ? "Cerrar" : "Reabrir"} {formatearOP(toggleOrden)}?
                             </h2>
                             <p className="text-slate-500 text-sm mt-1">
                                 {toggleProximoEstado === "CERRADA"
-                                    ? "Una vez cerrada, no se podrán registrar más solicitudes contra esta orden."
-                                    : "Al reabrirla, se podrán registrar nuevas solicitudes nuevamente."}
+                                    ? <>Todos los movimientos están cargados.<br />La orden dejará de aceptar nuevos registros.</>
+                                    : "La orden volverá a aceptar movimientos."}
                             </p>
                         </div>
-
-                        <label className="text-xs font-semibold text-slate-500 uppercase">
-                            Firma / PIN
-                        </label>
-
-                        <input
-                            className="input mt-1 mb-4"
-                            placeholder="Ingresa tu clave…"
-                            value={togglePin}
-                            onChange={(e) => setTogglePin(e.target.value)}
-                        />
 
                         <div className="flex justify-between mt-2 gap-3">
                             <button
                                 className="btn flex-1"
                                 onClick={() => {
                                     setToggleModalOpen(false);
-                                    setTogglePin("");
                                 }}
                             >
                                 Cancelar
@@ -1684,7 +1666,7 @@ export default function AlmacenPage() {
                                 className={`btn flex-1 ${toggleProximoEstado === "CERRADA" ? "btn-danger" : "btn-primary"}`}
                                 onClick={confirmarToggleOP}
                             >
-                                Confirmar
+                                {toggleProximoEstado === "CERRADA" ? "Cerrar OP" : "Reabrir OP"}
                             </button>
                         </div>
                     </div>
