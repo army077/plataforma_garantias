@@ -8,10 +8,8 @@ import {
     actualizarEstatusMovimiento,
     updateAlmacenMovimiento,
     deleteAlmacenMovimiento,
-    cerrarMovimientosPorOrden,
     listOrdenesCerradas,
-    toggleOrdenProduccion,
-    validarPinUsuario
+    toggleOrdenProduccion
 } from "../lib/api.js";
 import EstadoBadge from "../components/EstadoBadge";
 import { useAuth } from "../auth/AuthProvider.jsx";
@@ -70,11 +68,6 @@ export default function AlmacenPage() {
     const [mostrarSugerenciasOP, setMostrarSugerenciasOP] = useState(false);
     const [indiceSugerenciaActiva, setIndiceSugerenciaActiva] = useState(-1);
 
-
-    //cerrar solicitud
-    const [cerrarModalOpen, setCerrarModalOpen] = useState(false);
-    const [pinCerrar, setPinCerrar] = useState("");
-    const [ordenCerrar, setOrdenCerrar] = useState("");
 
     // OPs cerradas (no admiten nuevas solicitudes)
     const [ordenesCerradas, setOrdenesCerradas] = useState(new Set());
@@ -419,89 +412,6 @@ export default function AlmacenPage() {
         }
     };
 
-    const cerrarSolicitudDummy = async () => {
-        if (!pinCerrar || !ordenCerrar) {
-            alert("Debes ingresar PIN y seleccionar una orden.");
-            return;
-        }
-
-        try {
-            // 1) validar PIN contra backend
-            const res = await validarPinUsuario(pinCerrar);
-
-            if (!res?.valido) {
-                alert("PIN inválido");
-                return;
-            }
-
-            // 2) cerrar movimientos por orden (manda PIN al backend también)
-            await cerrarMovimientosPorOrden(ordenCerrar, pinCerrar);
-
-            // 3) refrescar data
-            await load();
-
-            // 4) resetear todo a estado inicial
-            resetToDefaultState();
-
-            alert("Orden cerrada correctamente.");
-
-        } catch (err) {
-            console.error(err);
-            alert("Error al validar PIN o cerrar la orden.");
-        }
-    };
-
-    const resetToDefaultState = () => {
-        // filtros
-        setFiltroOrden("");
-
-        // paginación
-        setPage(1);
-
-        // modales
-        setCerrarModalOpen(false);
-        setModalOpen(false);
-        setEditModalOpen(false);
-
-        // valores de PIN / orden
-        setPinCerrar("");
-        setOrdenCerrar("");
-        setDetalle(null);
-
-        // drawer / formularios
-        setDrawerOpen(false);
-        setSearch("");
-        setProductos([]);
-        setListaPiezas([]);
-
-        setForm({
-            persona: "",
-            estacion: "",
-            orden_produccion: "",
-            numero_parte: "",
-            descripcion: "",
-            cantidad: 1,
-            concepto_liberacion: ""
-        });
-
-        setResponsableSeleccionado(null);
-        setResponsableTexto("");
-        setMostrarSugerenciasResp(false);
-        setIndiceSugerenciaResp(-1);
-
-        setFormHeader({
-            estacion: "",
-            orden_produccion: "",
-            concepto_liberacion: ""
-        });
-
-        setCurrentPart({
-            numero_parte: "",
-            descripcion: "",
-            cantidad: 1
-        });
-    };
-
     // Mantener el texto visible del buscador sincronizado con la fuente de verdad del filtro
     useEffect(() => {
         setOpSearchText(filtroOrden ? formatearOP(filtroOrden) : "");
@@ -695,14 +605,6 @@ export default function AlmacenPage() {
                             Nueva solicitud
                         </button>
 
-                        {(role === "admin" || role === "supervisor") && (
-                            <button
-                                className="btn btn-danger"
-                                onClick={() => setCerrarModalOpen(true)}
-                            >
-                                Cerrar solicitud
-                            </button>
-                        )}
 
                     </div>
                 </div>
@@ -1544,86 +1446,6 @@ export default function AlmacenPage() {
                 </>
             )}
 
-
-            {cerrarModalOpen && (
-                <>
-                    <div
-                        className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-40"
-                        onClick={() => setCerrarModalOpen(false)}
-                    />
-
-                    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-            bg-white w-[90%] max-w-sm rounded-xl shadow-2xl p-6
-            z-50 border border-slate-200">
-
-                        <h3 className="text-lg font-semibold text-slate-900 mb-4 text-center">
-                            Cerrar solicitud
-                        </h3>
-
-                        <div className="space-y-3 text-sm">
-
-                            <div>
-                                <label className="text-xs font-semibold text-slate-500 uppercase">
-                                    PIN
-                                </label>
-                                <input
-                                    className="input mt-1"
-                                    value={pinCerrar}
-                                    onChange={(e) => setPinCerrar(e.target.value)}
-                                    placeholder="Ingresa tu PIN"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-xs font-semibold text-slate-500 uppercase">
-                                    Orden de producción
-                                </label>
-                                <select
-                                    className="input mt-1"
-                                    value={ordenCerrar}
-                                    onChange={(e) => setOrdenCerrar(e.target.value)}
-                                >
-                                    <option value="">Selecciona orden de producción</option>
-                                    {ordenesUnicas
-                                        .filter((op) => !esOrdenCerrada(op))
-                                        .map((op) => (
-                                            <option key={op} value={op}>
-                                                {op}
-                                            </option>
-                                        ))}
-                                </select>
-                            </div>
-
-                        </div>
-
-                        <div className="flex gap-3 mt-5">
-                            <button
-                                className="btn flex-1"
-                                onClick={() => {
-                                    setCerrarModalOpen(false);
-                                    setPinCerrar("");
-                                    setOrdenCerrar("");
-                                }}
-                            >
-                                Cancelar
-                            </button>
-
-                            <button
-                                className="btn btn-danger flex-1"
-                                onClick={() => {
-                                    cerrarSolicitudDummy();
-                                    setCerrarModalOpen(false);
-                                    setModalOpen(false);
-                                    setPinCerrar("");
-                                    setOrdenCerrar("");
-                                }}
-                            >
-                                Aceptar
-                            </button>
-                        </div>
-                    </div>
-                </>
-            )}
 
             {toggleModalOpen && (
                 <>
