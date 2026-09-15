@@ -801,7 +801,7 @@ router.get("/ordenes/:orden/responsable", autorizarRoles(["admin", "almacen", "g
   }
 });
 
-router.put("/ordenes/:orden/responsable", autorizarRoles(["admin", "almacen"]), async (req, res) => {
+router.put("/ordenes/:orden/responsable", autorizarRoles(["admin", "almacen", "solicitante"]), async (req, res) => {
   const orden = normalizarOrdenProduccion(req.params.orden || "");
   if (!orden || orden.length > 50) {
     return res.status(400).json({ error: "Orden requerida, máximo 50 caracteres" });

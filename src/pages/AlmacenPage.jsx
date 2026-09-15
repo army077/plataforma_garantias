@@ -49,7 +49,7 @@ function formatearOP(value) {
 
 export default function AlmacenPage() {
     const { user, role, usuarioId } = useAuth();
-    const puedeAsignarOP = role === "admin" || role === "almacen";
+    const puedeAsignarOP = role === "admin" || role === "almacen" || role === "solicitante";
     const [responsablesPorOP, setResponsablesPorOP] = useState(null);
     const [loadingResponsablesOP, setLoadingResponsablesOP] = useState(true);
     const [errorResponsablesOP, setErrorResponsablesOP] = useState(null);
