@@ -4,6 +4,14 @@ const router = express.Router();
 const bcrypt = require("bcrypt");
 const { pool } = require("../db");
 const almacenAdmin = require("../firebase_almacen");
+const autorizarRoles = require("../middleware/autorizarRoles");
+
+function normalizarOrdenProduccion(value) {
+    if (value == null) return value;
+    const orden = String(value).trim();
+    const match = /^OP\s*(\d+)$/i.exec(orden);
+    return match ? match[1] : orden;
+}
 
 /* ============================================================
    🧱 BOOTSTRAP: tabla de órdenes de producción cerradas
@@ -39,7 +47,7 @@ async function ordenEstaCerrada(orden) {
     if (!orden) return false;
     const q = await pool.query(
         `SELECT 1 FROM ordenes_cerradas WHERE orden_produccion = $1 LIMIT 1`,
-        [String(orden).trim()]
+        [normalizarOrdenProduccion(orden)]
     );
     return q.rowCount > 0;
 }
@@ -293,7 +301,7 @@ router.post("/crear", async (req, res) => {
       [
         persona,
         estacion,
-        orden_produccion,
+        normalizarOrdenProduccion(orden_produccion),
         numero_parte,
         descripcion,
         cantidad,
@@ -418,7 +426,7 @@ router.post("/crear_pin", async (req, res) => {
             [
                 usuario.nombre,   // persona automático
                 estacion,
-                orden_produccion,
+                normalizarOrdenProduccion(orden_produccion),
                 numero_parte,
                 descripcion,
                 cantidad,
@@ -574,7 +582,7 @@ router.put("/movimientos/:id/status", async (req, res) => {
 });
 
 router.put("/movimientos/orden/:orden/cerrar", async (req, res) => {
-  const orden = String(req.params.orden || "").trim();
+  const orden = normalizarOrdenProduccion(req.params.orden || "");
   const { pin } = req.body || {};
 
   if (!orden) {
@@ -661,7 +669,7 @@ router.get("/ordenes/cerradas", async (_req, res) => {
 
 // PUT reabrir una OP (requiere PIN)
 router.put("/movimientos/orden/:orden/abrir", async (req, res) => {
-  const orden = String(req.params.orden || "").trim();
+  const orden = normalizarOrdenProduccion(req.params.orden || "");
   const { pin } = req.body || {};
 
   if (!orden) return res.status(400).json({ error: "Orden requerida" });
@@ -691,7 +699,7 @@ router.put("/movimientos/orden/:orden/abrir", async (req, res) => {
 
 // POST alternar estado de la OP (cerrar ↔ abrir) — útil para el candado
 router.post("/ordenes/:orden/toggle", async (req, res) => {
-  const orden = String(req.params.orden || "").trim();
+  const orden = normalizarOrdenProduccion(req.params.orden || "");
   const { pin } = req.body || {};
 
   if (!orden) return res.status(400).json({ error: "Orden requerida" });
@@ -740,6 +748,116 @@ router.post("/ordenes/:orden/toggle", async (req, res) => {
   } catch (err) {
     console.error("Error toggle OP:", err);
     res.status(500).json({ error: "No se pudo cambiar el estado de la orden" });
+  }
+});
+
+// Asignación actual por OP. Requiere aplicar la migración SQL por separado.
+// Identidad y roles resueltos en backend mediante autorizarRoles.
+router.get("/ordenes/responsables", autorizarRoles(["admin", "almacen", "garantias", "supervisor", "solicitante"]), async (_req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT a.orden_produccion, a.responsable_id,
+             u.nombre AS responsable_nombre, a.asignado_por,
+             actor.nombre AS asignado_por_nombre, a.asignado_en
+      FROM ordenes_produccion_asignaciones a
+      LEFT JOIN usuarios_almacen u ON u.id = a.responsable_id
+      LEFT JOIN usuarios actor ON actor.id = a.asignado_por
+      ORDER BY a.orden_produccion ASC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error listando responsables de OP:", error);
+    res.status(500).json({ error: "Error al obtener responsables de OP" });
+  }
+});
+
+router.get("/ordenes/:orden/responsable", autorizarRoles(["admin", "almacen", "garantias", "supervisor", "solicitante"]), async (req, res) => {
+  const orden = normalizarOrdenProduccion(req.params.orden || "");
+  if (!orden || orden.length > 50) {
+    return res.status(400).json({ error: "Orden requerida, máximo 50 caracteres" });
+  }
+
+  try {
+    const result = await pool.query(`
+      SELECT op.orden_produccion, a.responsable_id,
+             u.nombre AS responsable_nombre, a.asignado_por,
+             actor.nombre AS asignado_por_nombre, a.asignado_en
+      FROM (SELECT $1::varchar(50) AS orden_produccion) op
+      LEFT JOIN ordenes_produccion_asignaciones a
+        ON a.orden_produccion = op.orden_produccion
+      LEFT JOIN usuarios_almacen u ON u.id = a.responsable_id
+      LEFT JOIN usuarios actor ON actor.id = a.asignado_por
+      WHERE EXISTS (
+        SELECT 1 FROM almacen_movimientos WHERE orden_produccion = $1
+      )
+    `, [orden]);
+    if (!result.rowCount) {
+      return res.status(404).json({ error: "No se encontraron movimientos para esa orden" });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error obteniendo responsable de OP:", error);
+    res.status(500).json({ error: "Error al obtener responsable de OP" });
+  }
+});
+
+router.put("/ordenes/:orden/responsable", autorizarRoles(["admin", "almacen"]), async (req, res) => {
+  const orden = normalizarOrdenProduccion(req.params.orden || "");
+  if (!orden || orden.length > 50) {
+    return res.status(400).json({ error: "Orden requerida, máximo 50 caracteres" });
+  }
+
+  const { responsable_id } = req.body || {};
+  if (responsable_id !== null &&
+      (!Number.isInteger(responsable_id) || responsable_id <= 0 || responsable_id > 2147483647)) {
+    return res.status(400).json({ error: "responsable_id debe ser un entero positivo o null" });
+  }
+
+  try {
+    const existe = await pool.query(
+      "SELECT 1 FROM almacen_movimientos WHERE orden_produccion = $1 LIMIT 1",
+      [orden]
+    );
+    if (!existe.rowCount) {
+      return res.status(404).json({ error: "No se encontraron movimientos para esa orden" });
+    }
+
+    if (responsable_id !== null) {
+      const usuario = await pool.query(
+        "SELECT 1 FROM usuarios_almacen WHERE id = $1",
+        [responsable_id]
+      );
+      if (!usuario.rowCount) {
+        return res.status(404).json({ error: "Responsable no encontrado en usuarios_almacen" });
+      }
+    }
+
+    const result = await pool.query(`
+      WITH asignacion AS (
+        INSERT INTO ordenes_produccion_asignaciones (orden_produccion, responsable_id, asignado_por)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (orden_produccion) DO UPDATE
+          SET responsable_id = EXCLUDED.responsable_id,
+              asignado_por = EXCLUDED.asignado_por,
+              asignado_en = now()
+        RETURNING orden_produccion, responsable_id, asignado_por, asignado_en
+      )
+      SELECT a.orden_produccion, a.responsable_id,
+             u.nombre AS responsable_nombre, a.asignado_por,
+             actor.nombre AS asignado_por_nombre, a.asignado_en
+      FROM asignacion a
+      LEFT JOIN usuarios_almacen u ON u.id = a.responsable_id
+      LEFT JOIN usuarios actor ON actor.id = a.asignado_por
+    `, [orden, responsable_id, req.usuarioPlataforma.id]);
+    res.json(result.rows[0]);
+  } catch (error) {
+    // El usuario podría eliminarse entre la validación y el UPSERT.
+    if (error.code === "23503" &&
+        error.constraint === "ordenes_produccion_asignaciones_responsable_id_fkey") {
+      return res.status(404).json({ error: "Responsable no encontrado en usuarios_almacen" });
+    }
+    console.error("Error asignando responsable de OP:", error);
+    res.status(500).json({ error: "Error al asignar responsable de OP" });
   }
 });
 
@@ -843,7 +961,7 @@ router.put("/movimientos/:id", async (req, res) => {
       [
         persona,
         estacion,
-        orden_produccion,
+        normalizarOrdenProduccion(orden_produccion),
         numero_parte,
         descripcion,
         cantidad,

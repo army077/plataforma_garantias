@@ -1,8 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
     listAlmacenMovimientos,
+    normalizarOrdenProduccion,
     createAlmacenMovimiento,
     getUsuariosAlmacen,
+    listResponsablesPorOrden,
+    getResponsablePorOrden,
+    updateResponsablePorOrden,
     buscarProductoAlmacen,
     atenderAlmacenMovimiento,
     actualizarEstatusMovimiento,
@@ -18,8 +22,13 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import LockIcon from "@mui/icons-material/Lock";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
+import Autocomplete from "@mui/material/Autocomplete";
+import TextField from "@mui/material/TextField";
 
 const PERSONA_POR_ASIGNAR = "Por asignar";
+const opcionSinResponsable = { id: null, nombre: PERSONA_POR_ASIGNAR, esPorAsignar: true };
+const claveOP = normalizarOrdenProduccion;
+const firmaAsignacion = (a) => JSON.stringify([a?.responsable_id ?? null, a?.asignado_por ?? null, a?.asignado_en ?? null]);
 
 function normalizarTexto(str) {
     return (str || "")
@@ -30,10 +39,7 @@ function normalizarTexto(str) {
 }
 
 // Normaliza "OP3889", "op3889" o "3889" a la forma pura "3889" para comparar OPs
-function normalizarOP(value) {
-    if (!value) return "";
-    return String(value).trim().replace(/^OP/i, "").trim();
-}
+const normalizarOP = normalizarOrdenProduccion;
 
 // Formatea cualquier valor de OP para mostrarse siempre con el prefijo "OP" (ej. "OP3889")
 function formatearOP(value) {
@@ -43,6 +49,101 @@ function formatearOP(value) {
 
 export default function AlmacenPage() {
     const { user, role, usuarioId } = useAuth();
+    const puedeAsignarOP = role === "admin" || role === "almacen";
+    const [responsablesPorOP, setResponsablesPorOP] = useState(null);
+    const [loadingResponsablesOP, setLoadingResponsablesOP] = useState(true);
+    const [errorResponsablesOP, setErrorResponsablesOP] = useState(null);
+    const [operacionesResponsablePorOP, setOperacionesResponsablePorOP] = useState({});
+    const bloqueosOP = useRef(new Set());
+    const incertidumbreOP = useRef(new Set());
+    const basesAsignacion = useRef({});
+    const versionResponsables = useRef(0);
+    const [editorOP, setEditorOP] = useState(null);
+    const [editorSeleccion, setEditorSeleccion] = useState(null);
+    const [guardandoSolicitud, setGuardandoSolicitud] = useState(false);
+    const envioSolicitud = useRef(false);
+    const [resultadoSolicitud, setResultadoSolicitud] = useState(null);
+    const [asignacionPendiente, setAsignacionPendiente] = useState(null);
+    const [movimientoIncierto, setMovimientoIncierto] = useState(false);
+    const [seleccionOPModificada, setSeleccionOPModificada] = useState(false);
+    const [buscandoResponsable, setBuscandoResponsable] = useState(false);
+
+    const cargarAsignacionesOP = async () => {
+        if (bloqueosOP.current.size) return;
+        const version = ++versionResponsables.current;
+        setLoadingResponsablesOP(true);
+        try {
+            const data = await listResponsablesPorOrden();
+            if (!Array.isArray(data)) throw new Error("Respuesta inválida");
+            if (version !== versionResponsables.current) return;
+            setResponsablesPorOP(Object.fromEntries(data.map(a => [claveOP(a.orden_produccion), a])));
+            setErrorResponsablesOP(null);
+        } catch (_) {
+            if (version === versionResponsables.current) setErrorResponsablesOP("No se pudo consultar el servicio de responsables de OP.");
+        } finally {
+            if (version === versionResponsables.current) setLoadingResponsablesOP(false);
+        }
+    };
+
+    const textoResponsableOP = (orden) => {
+        if (!claveOP(orden)) return "Sin OP";
+        if (errorResponsablesOP) return "No se pudo consultar el responsable";
+        if (!responsablesPorOP) return "Consultando responsable…";
+        const asignacion = responsablesPorOP[claveOP(orden)];
+        return asignacion?.responsable_id == null ? "⚠ Por asignar" : asignacion.responsable_nombre;
+    };
+
+    const guardarResponsableOP = async (orden, responsableId, reconciliar = false, reservado = false) => {
+        const op = claveOP(orden);
+        if (!puedeAsignarOP || (!reservado && bloqueosOP.current.has(op))) throw new Error("Operación no permitida o ya en curso para esta OP.");
+        bloqueosOP.current.add(op);
+        ++versionResponsables.current;
+        let incierto = incertidumbreOP.current.has(op);
+        let escribiendo = false;
+        setOperacionesResponsablePorOP(prev => ({ ...prev, [op]: { loading: true, incierto } }));
+        try {
+            // Siempre consultar antes de escribir. Un GET fallido NO resuelve un PUT incierto.
+            const actual = await getResponsablePorOrden(op);
+            incertidumbreOP.current.delete(op);
+            setResponsablesPorOP(prev => ({ ...prev, [op]: actual }));
+            const base = basesAsignacion.current[op];
+            const cambioExterno = !base || firmaAsignacion(base) !== firmaAsignacion(actual);
+            basesAsignacion.current[op] = actual;
+            if (actual.responsable_id === responsableId) {
+                setOperacionesResponsablePorOP(prev => ({ ...prev, [op]: {} }));
+                return actual;
+            }
+            if (incierto || reconciliar || cambioExterno) {
+                const nombreActual = actual.responsable_nombre || PERSONA_POR_ASIGNAR;
+                if (!window.confirm(
+                    (cambioExterno ? "La asignación cambió o no había podido verificarse. " : "Se consultó el estado real. ") +
+                    "Responsable actual: " + nombreActual + ". ¿Confirmas que deseas cambiar la asignación de toda la OP?"
+                )) {
+                    const error = new Error("Estado actualizado. La asignación no se cambió; confirma de nuevo si deseas reasignar.");
+                    error.local = true;
+                    throw error;
+                }
+            }
+            incierto = false;
+            escribiendo = true;
+            const data = await updateResponsablePorOrden(op, responsableId);
+            basesAsignacion.current[op] = data;
+            setResponsablesPorOP(prev => ({ ...prev, [op]: data }));
+            setOperacionesResponsablePorOP(prev => ({ ...prev, [op]: {} }));
+            return data;
+        } catch (error) {
+            const status = error.response?.status;
+            if (escribiendo && (!status || status >= 500)) incertidumbreOP.current.add(op);
+            const mensaje = error.local ? error.message : status === 401 || status === 403 ? "Tu sesión no permite consultar o cambiar el responsable."
+                : status === 404 ? "No se encontró la OP, el responsable o el servicio. Actualiza el catálogo y vuelve a consultar."
+                    : "No se pudo confirmar la asignación. Se consultará su estado antes de reintentar.";
+            setOperacionesResponsablePorOP(prev => ({ ...prev, [op]: { error: mensaje, incierto: incertidumbreOP.current.has(op) } }));
+            throw error;
+        } finally {
+            bloqueosOP.current.delete(op);
+            setLoadingResponsablesOP(false);
+        }
+    };
     const navigate = useNavigate();
 
     const [rows, setRows] = useState([]);
@@ -119,6 +220,24 @@ export default function AlmacenPage() {
 
     // --- Lista acumulada de piezas ---
     const [listaPiezas, setListaPiezas] = useState([]);
+    const opFormularioAnterior = useRef(null);
+    useEffect(() => {
+        if (!drawerOpen || !puedeAsignarOP || guardandoSolicitud || asignacionPendiente) return;
+        const op = claveOP(formHeader.orden_produccion);
+        const cambioOP = opFormularioAnterior.current !== op;
+        if (cambioOP) opFormularioAnterior.current = op;
+        if (!responsablesPorOP || errorResponsablesOP) return;
+        const actual = responsablesPorOP[op];
+        if (cambioOP || (!seleccionOPModificada && !buscandoResponsable)) {
+            basesAsignacion.current[op] = actual || { responsable_id: null, asignado_por: null, asignado_en: null };
+        }
+        if (seleccionOPModificada || buscandoResponsable) return;
+        const seleccion = actual?.responsable_id != null
+            ? { id: actual.responsable_id, nombre: actual.responsable_nombre }
+            : opcionSinResponsable;
+        setResponsableSeleccionado(seleccion);
+        setResponsableTexto(seleccion.nombre);
+    }, [drawerOpen, formHeader.orden_produccion, responsablesPorOP, errorResponsablesOP, puedeAsignarOP, seleccionOPModificada, buscandoResponsable, guardandoSolicitud, asignacionPendiente]);
 
     const cargarResponsables = async () => {
         setResponsablesLoading(true);
@@ -144,24 +263,24 @@ export default function AlmacenPage() {
             listAlmacenMovimientos(),
             listOrdenesCerradas().catch(() => [])
         ]);
-        setRows(data);
+        setRows(data.map(r => ({ ...r, orden_produccion: claveOP(r.orden_produccion) })));
 
         // Obtener órdenes únicas
         const setOrdenes = Array.from(
-            new Set(data.map(r => r.orden_produccion).filter(Boolean))
+            new Set(data.map(r => claveOP(r.orden_produccion)).filter(Boolean))
         );
         setOrdenesUnicas(setOrdenes);
 
         // Indexar OPs cerradas
         setOrdenesCerradas(
-            new Set((cerradas || []).map(c => String(c.orden_produccion)))
+            new Set((cerradas || []).map(c => claveOP(c.orden_produccion)))
         );
     };
 
     // Helpers OP cerrada
-    const esOrdenCerrada = (op) => ordenesCerradas.has(String(op || "").trim());
+    const esOrdenCerrada = (op) => ordenesCerradas.has(claveOP(op));
     const ordenesAbiertas = useMemo(
-        () => ordenesUnicas.filter(op => !ordenesCerradas.has(String(op || "").trim())),
+        () => ordenesUnicas.filter(op => !ordenesCerradas.has(claveOP(op))),
         [ordenesUnicas, ordenesCerradas]
     );
 
@@ -188,6 +307,8 @@ export default function AlmacenPage() {
 
     const seleccionarResponsable = (opcion) => {
         if (!opcion) return;
+        setSeleccionOPModificada(true);
+        setBuscandoResponsable(false);
         setResponsableSeleccionado(opcion);
         setResponsableTexto(opcion.nombre);
         setMostrarSugerenciasResp(false);
@@ -195,6 +316,7 @@ export default function AlmacenPage() {
     };
 
     const limpiarResponsable = () => {
+        setBuscandoResponsable(true);
         setResponsableSeleccionado(null);
         setResponsableTexto("");
         setMostrarSugerenciasResp(false);
@@ -232,6 +354,9 @@ export default function AlmacenPage() {
     };
 
     const resetFormNuevaSolicitud = () => {
+        setSeleccionOPModificada(false);
+        setBuscandoResponsable(false);
+        opFormularioAnterior.current = null;
         setResponsableSeleccionado(null);
         setResponsableTexto("");
         setMostrarSugerenciasResp(false);
@@ -252,6 +377,13 @@ export default function AlmacenPage() {
     };
 
     const cerrarDrawer = () => {
+        if (envioSolicitud.current) return;
+        if ((asignacionPendiente || resultadoSolicitud) && !window.confirm("Hay un resultado de guardado pendiente. ¿Cerrar y descartar este seguimiento local? Los movimientos guardados se conservan.")) return;
+        setAsignacionPendiente(null);
+        setResultadoSolicitud(null);
+        setMovimientoIncierto(false);
+        setSeleccionOPModificada(false);
+        opFormularioAnterior.current = null;
         resetFormNuevaSolicitud();
         setDrawerOpen(false);
     };
@@ -286,9 +418,11 @@ export default function AlmacenPage() {
     useEffect(() => {
         load(); // carga inicial
         cargarResponsables(); // carga inicial de responsables
+        cargarAsignacionesOP();
 
         const interval = setInterval(() => {
             load(); // refresco cada 10s
+            cargarAsignacionesOP();
         }, 10000);
 
         return () => clearInterval(interval);
@@ -319,6 +453,7 @@ export default function AlmacenPage() {
     };
 
     const handleCrearTodo = async () => {
+        if (envioSolicitud.current || asignacionPendiente || movimientoIncierto) return;
         if (!responsableSeleccionado || normalizarTexto(responsableTexto) !== normalizarTexto(responsableSeleccionado.nombre)) {
             alert("Debes seleccionar un Responsable / Operador del catálogo o elegir 'Por asignar'.");
             return;
@@ -330,7 +465,11 @@ export default function AlmacenPage() {
         }
 
         // 🚫 Bloqueo en cliente si la OP está cerrada
-        const ordenIngresada = String(formHeader.orden_produccion).trim();
+        const ordenIngresada = claveOP(formHeader.orden_produccion);
+        if (!ordenIngresada || ordenIngresada.length > 50) {
+            alert("Indica una OP de entre 1 y 50 caracteres.");
+            return;
+        }
         if (esOrdenCerrada(ordenIngresada)) {
             alert(`La Orden ${ordenIngresada} está cerrada. No se pueden registrar más movimientos.`);
             return;
@@ -345,29 +484,69 @@ export default function AlmacenPage() {
             ? PERSONA_POR_ASIGNAR
             : responsableSeleccionado.nombre;
 
+        if (bloqueosOP.current.has(ordenIngresada)) return;
+        const responsableId = responsableSeleccionado.esPorAsignar ? null : responsableSeleccionado.id;
+        const servicioDisponible = responsablesPorOP !== null && !errorResponsablesOP;
+        const actual = responsablesPorOP?.[ordenIngresada]?.responsable_id ?? null;
+        const cambiarAsignacion = puedeAsignarOP && seleccionOPModificada && (!servicioDisponible || actual !== responsableId);
+        // Una OP nueva con selección explícita también requiere una asignación real.
+        const opNueva = !rows.some(r => claveOP(r.orden_produccion) === ordenIngresada);
+        const asignar = cambiarAsignacion || (puedeAsignarOP && opNueva && responsableId !== null);
+        if (asignar && !opNueva && !window.confirm("La reasignación afectará a todos los movimientos de esta OP. ¿Continuar?")) return;
+        envioSolicitud.current = true;
+        bloqueosOP.current.add(ordenIngresada);
+        ++versionResponsables.current;
+        setGuardandoSolicitud(true);
+        setResultadoSolicitud(null);
+        let confirmados = 0;
+        const piezas = [...listaPiezas];
         try {
-            for (const pieza of listaPiezas) {
-                await createAlmacenMovimiento({
-                    persona: nombrePersona,
-                    estacion: formHeader.estacion,
-                    orden_produccion: formHeader.orden_produccion,
-                    concepto_liberacion: formHeader.concepto_liberacion,
-                    numero_parte: pieza.numero_parte,
-                    descripcion: pieza.descripcion,
-                    cantidad: pieza.cantidad
-                });
+            // El catálogo no condiciona la creación. El PUT valida el ID en backend.
+            for (const pieza of piezas) {
+                try {
+                    await createAlmacenMovimiento({
+                        persona: nombrePersona,
+                        estacion: formHeader.estacion,
+                        orden_produccion: ordenIngresada,
+                        concepto_liberacion: formHeader.concepto_liberacion,
+                        numero_parte: pieza.numero_parte,
+                        descripcion: pieza.descripcion,
+                        cantidad: pieza.cantidad
+                    });
+                    confirmados++;
+                    setListaPiezas(piezas.slice(confirmados));
+                } catch (error) {
+                    const incierto = !error.response || error.response.status >= 500;
+                    setMovimientoIncierto(incierto ? { pieza, op: ordenIngresada } : false);
+                    if (incierto) setListaPiezas(piezas.slice(confirmados + 1));
+                    setResultadoSolicitud(`${confirmados} movimientos confirmados de ${piezas.length}. No se cambió la asignación. ${incierto ? "El último envío tiene resultado desconocido; revisa Movimientos antes de resolver los pendientes. No vuelvas a enviarlo sin comprobarlo." : "Los pendientes permanecen en el formulario para reintento explícito."}`);
+                    return;
+                }
             }
-
+            if (asignar) {
+                const pendiente = { op: ordenIngresada, responsableId };
+                setAsignacionPendiente(pendiente);
+                try {
+                    await guardarResponsableOP(ordenIngresada, responsableId, false, true);
+                    setAsignacionPendiente(null);
+                } catch (_) {
+                    setResultadoSolicitud("Movimientos guardados; asignación pendiente de confirmar");
+                    return;
+                }
+            }
             resetFormNuevaSolicitud();
             setDrawerOpen(false);
-
+            setSeleccionOPModificada(false);
+            opFormularioAnterior.current = null;
+            alert(asignar ? "Movimientos y asignación guardados." : "Movimientos guardados. La asignación de OP no se modificó.");
+        } catch (_) {
+            setResultadoSolicitud(`${confirmados} movimientos confirmados. Revisa el resultado antes de continuar.`);
+        } finally {
+            bloqueosOP.current.delete(ordenIngresada);
+            envioSolicitud.current = false;
+            setGuardandoSolicitud(false);
             load();
-            alert("Solicitudes creadas correctamente.");
-        } catch (e) {
-            console.error(e);
-            // Surfaceamos el mensaje del backend (ej. OP_CERRADA)
-            const msg = e?.response?.data?.error || "Error al guardar.";
-            alert(msg);
+            cargarAsignacionesOP();
         }
     };
 
@@ -503,6 +682,43 @@ export default function AlmacenPage() {
 
     return (
         <div className="space-y-5">
+            {errorResponsablesOP && <div className="p-3 bg-amber-50 text-amber-900 rounded" role="status">
+                {errorResponsablesOP} Los movimientos siguen disponibles. No se cambiarán asignaciones.
+                <button type="button" className="underline ml-2" disabled={loadingResponsablesOP} onClick={cargarAsignacionesOP}>Reintentar consulta</button>
+            </div>}
+            {editorOP && <div className="fixed inset-0 z-[70] bg-black/30 flex items-center justify-center" onClick={event => event.stopPropagation()}>
+                <section role="dialog" aria-modal="true" aria-labelledby="titulo-responsable-op" className="bg-white rounded-xl p-6 w-full max-w-lg space-y-4">
+                    <h3 id="titulo-responsable-op" className="font-semibold">Responsable de OP {editorOP}</h3>
+                    <p className="text-sm">El cambio afecta a todos los movimientos de esta OP. La persona histórica se conserva.</p>
+                    <Autocomplete
+                        options={[opcionSinResponsable, ...responsablesActivos]}
+                        value={editorSeleccion}
+                        getOptionLabel={option => option.nombre || ""}
+                        getOptionKey={option => option.id ?? "sin-responsable"}
+                        isOptionEqualToValue={(a, b) => a.id === b.id}
+                        onChange={(_event, value) => setEditorSeleccion(value)}
+                        disabled={Boolean(operacionesResponsablePorOP[editorOP]?.loading)}
+                        loading={responsablesLoading}
+                        renderInput={params => <TextField {...params} label="Buscar responsable" />}
+                    />
+                    {responsablesError && <p className="text-sm text-red-700">{responsablesError} <button className="underline" onClick={cargarResponsables}>Actualizar catálogo</button></p>}
+                    {errorResponsablesOP && <p className="text-sm text-red-700">{errorResponsablesOP}</p>}
+                    {operacionesResponsablePorOP[editorOP]?.error && <p className="text-sm text-red-700" role="alert">{operacionesResponsablePorOP[editorOP].error}</p>}
+                    <div className="flex gap-3">
+                        <button className="btn" disabled={operacionesResponsablePorOP[editorOP]?.loading} onClick={() => setEditorOP(null)}>Cerrar</button>
+                        <button className="btn btn-primary" disabled={!editorSeleccion || Boolean(errorResponsablesOP) || operacionesResponsablePorOP[editorOP]?.loading ||
+                            (editorSeleccion.id === (responsablesPorOP?.[editorOP]?.responsable_id ?? null) && !operacionesResponsablePorOP[editorOP]?.incierto)}
+                            onClick={async () => {
+                                const op = editorOP;
+                                try {
+                                    await guardarResponsableOP(op, editorSeleccion.id, operacionesResponsablePorOP[op]?.incierto);
+                                    setEditorOP(null);
+                                    cargarAsignacionesOP();
+                                } catch (_) { /* El error se muestra por OP. */ }
+                            }}>Guardar para toda la OP</button>
+                    </div>
+                </section>
+            </div>}
 
             <div className="space-y-3">
 
@@ -684,7 +900,7 @@ export default function AlmacenPage() {
                         <thead>
                             <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                                 <th className="px-4 py-3 text-left">ID</th>
-                                <th className="px-4 py-3 text-left">Persona</th>
+                                <th className="px-4 py-3 text-left">Responsable de OP</th>
                                 <th className="px-4 py-3 text-left">Orden</th>
                                 <th className="px-4 py-3 text-left">N° Parte</th>
                                 <th className="px-4 py-3 text-center">Cant</th>
@@ -711,8 +927,24 @@ export default function AlmacenPage() {
                                     <td className="px-4 py-3 font-medium text-slate-800">{r.id}</td>
 
                                     <td className="px-4 py-3">
-                                        <div className="font-semibold text-slate-800">{r.persona}</div>
+                                        <div className="font-semibold text-slate-800">{textoResponsableOP(r.orden_produccion)}</div>
                                         <div className="text-xs text-slate-400">Estación {r.estacion}</div>
+                                        {puedeAsignarOP && claveOP(r.orden_produccion) && (
+                                            <button type="button" className="text-xs text-blue-700 underline disabled:opacity-50"
+                                                disabled={!responsablesPorOP || Boolean(errorResponsablesOP) || operacionesResponsablePorOP[claveOP(r.orden_produccion)]?.loading || guardandoSolicitud}
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    const op = claveOP(r.orden_produccion);
+                                                    const actual = responsablesPorOP?.[op];
+                                                    basesAsignacion.current[op] = actual || { responsable_id: null, asignado_por: null, asignado_en: null };
+                                                    setEditorSeleccion(actual?.responsable_id != null ? { id: actual.responsable_id, nombre: actual.responsable_nombre } : opcionSinResponsable);
+                                                    setEditorOP(op);
+                                                    cargarResponsables();
+                                                }}>
+                                                {operacionesResponsablePorOP[claveOP(r.orden_produccion)]?.loading ? "Guardando…" : "Cambiar"}
+                                            </button>
+                                        )}
+                                        {operacionesResponsablePorOP[claveOP(r.orden_produccion)]?.error && <p className="text-xs text-red-700">{operacionesResponsablePorOP[claveOP(r.orden_produccion)].error}</p>}
                                     </td>
 
                                     <td className="px-4 py-3 text-slate-700">{r.orden_produccion}</td>
@@ -951,6 +1183,54 @@ export default function AlmacenPage() {
 
                         {/* CONTENIDO */}
                         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+                            <div className="text-sm bg-slate-50 p-3 rounded" aria-live="polite">
+                                Responsable actual de la OP: {textoResponsableOP(formHeader.orden_produccion)}
+                                <p>{puedeAsignarOP && !errorResponsablesOP && responsablesPorOP
+                                    ? "Una selección diferente cambiará el responsable de toda la OP después de guardar las piezas."
+                                    : "La selección de persona solo se registra en los movimientos; no modifica la asignación de OP."}</p>
+                            </div>
+                            {resultadoSolicitud && <div role="status" className="p-3 bg-amber-50 text-amber-900 rounded">
+                                <p>{resultadoSolicitud}</p>
+                                {movimientoIncierto && <div className="mt-2 space-y-2 border border-amber-400 p-3">
+                                    <p>Resultado desconocido, separado de las piezas pendientes: OP {movimientoIncierto.op}, pieza {movimientoIncierto.pieza.numero_parte}, cantidad {movimientoIncierto.pieza.cantidad}.</p>
+                                    <p>Revisa en Movimientos antes de decidir. No se reenviará automáticamente.</p>
+                                    <button type="button" className="btn" onClick={() => {
+                                        if (window.confirm("¿Confirmaste que esta pieza sí quedó guardada en el servidor?")) setMovimientoIncierto(false);
+                                    }}>Confirmé que se guardó</button>
+                                    <button type="button" className="btn ml-2" onClick={() => {
+                                        if (window.confirm("¿Confirmaste que NO se guardó? Si sí se guardó, reenviarla duplicará el movimiento.")) {
+                                            setListaPiezas(prev => [movimientoIncierto.pieza, ...prev]);
+                                            setMovimientoIncierto(false);
+                                        }
+                                    }}>Confirmé que no se guardó; pasar a pendientes</button>
+                                </div>}
+                            </div>}
+                            {asignacionPendiente && <div className="p-3 border rounded space-y-2">
+                                <p>OP {asignacionPendiente.op}: reintentar solamente la asignación. Las piezas ya están guardadas.</p>
+                                <Autocomplete options={[opcionSinResponsable, ...responsablesActivos]}
+                                    value={[opcionSinResponsable, ...listaResponsables].find(u => u.id === asignacionPendiente.responsableId) || null}
+                                    getOptionLabel={option => option.nombre || ""}
+                                    getOptionKey={option => option.id ?? "sin-responsable"}
+                                    isOptionEqualToValue={(a, b) => a.id === b.id}
+                                    disabled={guardandoSolicitud}
+                                    onChange={(_event, value) => { if (value) setAsignacionPendiente(prev => ({ ...prev, responsableId: value.id })); }}
+                                    renderInput={params => <TextField {...params} label="Responsable pendiente" />} />
+                                <button className="btn" onClick={cargarResponsables}>Actualizar catálogo</button>
+                                {operacionesResponsablePorOP[asignacionPendiente.op]?.error && <p className="text-red-700">{operacionesResponsablePorOP[asignacionPendiente.op].error}</p>}
+                                <button className="btn btn-primary" disabled={guardandoSolicitud || Boolean(errorResponsablesOP)} onClick={async () => {
+                                    if (envioSolicitud.current) return;
+                                    envioSolicitud.current = true;
+                                    setGuardandoSolicitud(true);
+                                    try {
+                                        await guardarResponsableOP(asignacionPendiente.op, asignacionPendiente.responsableId, true);
+                                        setAsignacionPendiente(null);
+                                        setResultadoSolicitud("Movimientos y asignación confirmados.");
+                                        cargarAsignacionesOP();
+                                    } catch (_) { /* No reenviar movimientos. */ }
+                                    finally { envioSolicitud.current = false; setGuardandoSolicitud(false); }
+                                }}>Consultar y reintentar solo asignación</button>
+                            </div>}
+                            <fieldset disabled={guardandoSolicitud || Boolean(asignacionPendiente)} className="space-y-6">
 
                             {/* ----------- DATOS GENERALES ----------- */}
                             <div className="card space-y-4">
@@ -962,7 +1242,7 @@ export default function AlmacenPage() {
                                 <div>
                                     <div className="flex items-center justify-between mb-1">
                                         <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wide">
-                                            Responsable / Operador
+                                            {puedeAsignarOP && !errorResponsablesOP && responsablesPorOP ? "Responsable de OP / Persona registrada" : "Persona registrada en el movimiento"}
                                         </label>
                                         {responsablesLoading && (
                                             <span className="text-[11px] text-slate-400">Cargando catálogo…</span>
@@ -1010,6 +1290,7 @@ export default function AlmacenPage() {
                                                 value={responsableTexto}
                                                 onChange={(e) => {
                                                     const val = e.target.value;
+                                                    setBuscandoResponsable(true);
                                                     setResponsableTexto(val);
                                                     setMostrarSugerenciasResp(true);
                                                     setIndiceSugerenciaResp(-1);
@@ -1049,7 +1330,7 @@ export default function AlmacenPage() {
                                                 >
                                                     {sugerenciasResponsable.map((opt, idx) => {
                                                         const esActivo = idx === indiceSugerenciaResp;
-                                                        const esSeleccionado = responsableSeleccionado?.nombre === opt.nombre;
+                                                        const esSeleccionado = responsableSeleccionado != null && responsableSeleccionado.id === opt.id;
 
                                                         if (opt.esPorAsignar) {
                                                             return (
@@ -1105,11 +1386,11 @@ export default function AlmacenPage() {
                                     <div className="mt-1">
                                         {responsableSeleccionado?.esPorAsignar ? (
                                             <p className="text-xs text-amber-600 flex items-center gap-1 font-medium">
-                                                <span>⚠</span> Asignación pendiente: se creará la OP sin responsable asignado.
+                                                <span>⚠</span> Persona registrada: Por asignar.
                                             </p>
                                         ) : responsableSeleccionado ? (
                                             <p className="text-xs text-emerald-600 flex items-center gap-1">
-                                                <span>✓</span> Responsable asignado: <strong>{responsableSeleccionado.nombre}</strong>
+                                                Persona registrada: <strong>{responsableSeleccionado.nombre}</strong>
                                             </p>
                                         ) : (
                                             <p className="text-[11px] text-slate-400">
@@ -1270,9 +1551,10 @@ export default function AlmacenPage() {
                             <div className="mt-6 pt-4 border-t border-slate-200">
                                 <button
                                     onClick={handleCrearTodo}
+                                    disabled={guardandoSolicitud || Boolean(asignacionPendiente) || movimientoIncierto}
                                     className="btn btn-primary w-full py-3 flex items-center justify-center gap-2"
                                 >
-                                    <span>Guardar Solicitud</span>
+                                    <span>{guardandoSolicitud ? "Guardando…" : "Guardar Solicitud"}</span>
                                     {listaPiezas.length > 0 && (
                                         <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">
                                             {listaPiezas.length}
@@ -1281,6 +1563,7 @@ export default function AlmacenPage() {
                                 </button>
                             </div>
 
+                            </fieldset>
                         </div>
                     </aside>
                 </>
@@ -1301,7 +1584,7 @@ export default function AlmacenPage() {
                         <div className="space-y-3 text-sm">
 
                             <div>
-                                <span className="font-semibold text-slate-500">Persona: </span>
+                                <span className="font-semibold text-slate-500">Persona registrada en el movimiento: </span>
                                 <span className="text-slate-800">{detalle.persona}</span>
                             </div>
 

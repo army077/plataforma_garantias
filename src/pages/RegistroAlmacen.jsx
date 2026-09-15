@@ -1,14 +1,8 @@
 // src/pages/RegistroAlmacen.jsx
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createAlmacenMovimiento, listAlmacenMovimientos, listOrdenesCerradas } from "../lib/api.js";
+import { createAlmacenMovimiento, listAlmacenMovimientos, listOrdenesCerradas, getResponsablePorOrden, normalizarOrdenProduccion } from "../lib/api.js";
 import { useAuth } from "../auth/AuthProvider.jsx";
-
-// Normaliza valores como "OP3889", "op3889" o "3889" al formato puro del backend: "3889"
-function normalizarOrdenProduccion(value) {
-  if (!value) return "";
-  return String(value).trim().replace(/^OP/i, "").trim();
-}
 
 // Formatea cualquier valor de OP para que en la interfaz siempre se visualice con el prefijo "OP" (ej. "OP3889")
 function formatearOpVisual(value) {
@@ -22,6 +16,15 @@ export default function RegistroAlmacen() {
 
   // Estados locales principales
   const [opActiva, setOpActiva] = useState("");
+  const opResponsable = normalizarOrdenProduccion(opActiva);
+  const responsableOP = useQuery({
+    queryKey: ["almacen_responsable_op", opResponsable],
+    queryFn: () => getResponsablePorOrden(opResponsable),
+    enabled: Boolean(opResponsable),
+    retry: false,
+    staleTime: 0,
+    refetchInterval: opResponsable ? 10000 : false,
+  });
   const [historialEscaneos, setHistorialEscaneos] = useState([]);
   const [inputCode, setInputCode] = useState("");
   const [toast, setToast] = useState(null); // { id, message, type: 'success'|'warning'|'error'|'info' }
@@ -224,7 +227,7 @@ export default function RegistroAlmacen() {
       return;
     }
 
-    setOpActiva(opVisual);
+    setOpActiva(opLimpia);
     setPiezaPendiente("");
     setCantidadInput("1");
 
@@ -567,6 +570,15 @@ export default function RegistroAlmacen() {
           <div className="md:col-span-2 bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
               <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Orden de Producción Activa</span>
+              {opActiva && (
+                <div className="text-sm text-slate-200 mt-2" aria-live="polite">
+                  {responsableOP.isError ? <>
+                    No se pudo consultar el responsable · <button type="button" className="underline" onClick={() => responsableOP.refetch()}>Reintentar</button>
+                  </> : responsableOP.isPending ? "Consultando responsable…"
+                    : responsableOP.data?.responsable_id == null ? "⚠ Por asignar"
+                      : `Responsable: ${responsableOP.data.responsable_nombre}`}
+                </div>
+              )}
               <div className="flex items-center gap-3 mt-1">
                 {opActiva ? (
                   <div className="flex items-center gap-2">

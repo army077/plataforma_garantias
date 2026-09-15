@@ -28,6 +28,9 @@ context/*
 !context/api12/
 !context/db/
 context/api12/*
+!context/api12/middleware/
+context/api12/middleware/*
+!context/api12/middleware/autorizarRoles.js
 !context/api12/routes/
 !context/api12/server.js
 !context/api12/db.js

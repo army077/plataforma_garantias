@@ -99,6 +99,23 @@ export const buscarProductos = async (q, start = 0, end = 10) =>
    ============================================================ */
 
 // GET: movimientos (todas las solicitudes sueltas del almacén)
+export function normalizarOrdenProduccion(value) {
+  const orden = String(value ?? "").trim();
+  const match = /^OP\s*(\d+)$/i.exec(orden);
+  return match ? match[1] : orden;
+}
+
+export const listResponsablesPorOrden = async () =>
+  (await api.get("/almacen/ordenes/responsables")).data;
+
+export const getResponsablePorOrden = async (ordenProduccion) =>
+  (await api.get(`/almacen/ordenes/${encodeURIComponent(normalizarOrdenProduccion(ordenProduccion))}/responsable`)).data;
+
+export const updateResponsablePorOrden = async (ordenProduccion, responsableId) =>
+  (await api.put(`/almacen/ordenes/${encodeURIComponent(normalizarOrdenProduccion(ordenProduccion))}/responsable`, {
+    responsable_id: responsableId,
+  })).data;
+
 export const listAlmacenMovimientos = async () => {
   const { data } = await api.get("/almacen/movimientos");
   return data;
@@ -116,12 +133,12 @@ export const createAlmacenMovimiento = async (payload) => {
   //   cantidad,
   //   concepto_liberacion
   // }
-  const { data } = await api.post("/almacen/crear", payload);
+  const { data } = await api.post("/almacen/crear", { ...payload, orden_produccion: normalizarOrdenProduccion(payload.orden_produccion) });
   return data;
 };
 
 export const createAlmacenMovimientoPin = async (payload) =>
-  (await api.post(`/almacen/crear_pin`, payload)).data;
+  (await api.post(`/almacen/crear_pin`, { ...payload, orden_produccion: normalizarOrdenProduccion(payload.orden_produccion) })).data;
 
 // POST: marcar como atendido
 export const atenderAlmacenMovimiento = async (id, atendio) => {
@@ -144,7 +161,7 @@ export const actualizarEstatusMovimiento = async (id, status) =>
 // PUT: cerrar todos los movimientos por orden de producción
 export const cerrarMovimientosPorOrden = async (ordenProduccion, pin) => {
   const { data } = await api.put(
-    `/almacen/movimientos/orden/${encodeURIComponent(ordenProduccion)}/cerrar`,
+    `/almacen/movimientos/orden/${encodeURIComponent(normalizarOrdenProduccion(ordenProduccion))}/cerrar`,
     pin ? { pin } : {}
   );
   return data;
@@ -153,7 +170,7 @@ export const cerrarMovimientosPorOrden = async (ordenProduccion, pin) => {
 // PUT: reabrir una OP (requiere PIN)
 export const abrirOrdenProduccion = async (ordenProduccion, pin) => {
   const { data } = await api.put(
-    `/almacen/movimientos/orden/${encodeURIComponent(ordenProduccion)}/abrir`,
+    `/almacen/movimientos/orden/${encodeURIComponent(normalizarOrdenProduccion(ordenProduccion))}/abrir`,
     pin ? { pin } : {}
   );
   return data;
@@ -168,7 +185,7 @@ export const listOrdenesCerradas = async () => {
 // POST: alternar estado de una OP (abrir ↔ cerrar) usando PIN
 export const toggleOrdenProduccion = async (ordenProduccion, pin) => {
   const { data } = await api.post(
-    `/almacen/ordenes/${encodeURIComponent(ordenProduccion)}/toggle`,
+    `/almacen/ordenes/${encodeURIComponent(normalizarOrdenProduccion(ordenProduccion))}/toggle`,
     pin ? { pin } : {}
   );
   return data;
@@ -178,7 +195,7 @@ export const cambiarStatusConPin = async (id, nuevo_status, pin) =>
   (await api.post(`/almacen/cambiar_status_pin/${id}`, { nuevo_status, pin })).data;
 
 export const updateAlmacenMovimiento = async (id, payload) =>
-  (await api.put(`/almacen/movimientos/${id}`, payload)).data;
+  (await api.put(`/almacen/movimientos/${id}`, { ...payload, orden_produccion: normalizarOrdenProduccion(payload.orden_produccion) })).data;
 
 export const deleteAlmacenMovimiento = async (id) =>
   (await api.delete(`/almacen/movimientos/${id}`)).data;
