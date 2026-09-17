@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
     listAlmacenMovimientos,
+    listAlmacenSolicitudes,
+    createAlmacenSolicitud,
     normalizarOrdenProduccion,
     createAlmacenMovimiento,
     getUsuariosAlmacen,
@@ -147,6 +149,24 @@ export default function AlmacenPage() {
     const navigate = useNavigate();
 
     const [rows, setRows] = useState([]);
+    const [solicitudes, setSolicitudes] = useState([]);
+    const [errorCarga, setErrorCarga] = useState(null);
+    const versionCarga = useRef(0);
+    const filas = useMemo(() => {
+        const conMovimientos = new Set(rows.map(r => claveOP(r.orden_produccion)));
+        const vacias = new Map();
+        for (const solicitud of solicitudes) {
+            const op = claveOP(solicitud.orden_produccion);
+            if (!op || conMovimientos.has(op)) continue;
+            const anterior = vacias.get(op);
+            if (!anterior || new Date(solicitud.creado_en) > new Date(anterior.creado_en) ||
+                (solicitud.creado_en === anterior.creado_en && solicitud.id > anterior.solicitud_id)) {
+                const { id, ...datos } = solicitud;
+                vacias.set(op, { ...datos, solicitud_id: id, orden_produccion: op, sinPiezas: true });
+            }
+        }
+        return [...vacias.values(), ...rows];
+    }, [rows, solicitudes]);
     const [page, setPage] = useState(1);
     const [pageSize] = useState(10);
     const [drawerOpen, setDrawerOpen] = useState(false);
@@ -222,7 +242,7 @@ export default function AlmacenPage() {
     const [listaPiezas, setListaPiezas] = useState([]);
     const opFormularioAnterior = useRef(null);
     useEffect(() => {
-        if (!drawerOpen || !puedeAsignarOP || guardandoSolicitud || asignacionPendiente) return;
+        if (!drawerOpen || !puedeAsignarOP || guardandoSolicitud || asignacionPendiente || movimientoIncierto) return;
         const op = claveOP(formHeader.orden_produccion);
         const cambioOP = opFormularioAnterior.current !== op;
         if (cambioOP) opFormularioAnterior.current = op;
@@ -237,7 +257,7 @@ export default function AlmacenPage() {
             : opcionSinResponsable;
         setResponsableSeleccionado(seleccion);
         setResponsableTexto(seleccion.nombre);
-    }, [drawerOpen, formHeader.orden_produccion, responsablesPorOP, errorResponsablesOP, puedeAsignarOP, seleccionOPModificada, buscandoResponsable, guardandoSolicitud, asignacionPendiente]);
+    }, [drawerOpen, formHeader.orden_produccion, responsablesPorOP, errorResponsablesOP, puedeAsignarOP, seleccionOPModificada, buscandoResponsable, guardandoSolicitud, asignacionPendiente, movimientoIncierto]);
 
     const cargarResponsables = async () => {
         setResponsablesLoading(true);
@@ -259,22 +279,31 @@ export default function AlmacenPage() {
     };
 
     const load = async () => {
-        const [data, cerradas] = await Promise.all([
-            listAlmacenMovimientos(),
-            listOrdenesCerradas().catch(() => [])
-        ]);
-        setRows(data.map(r => ({ ...r, orden_produccion: claveOP(r.orden_produccion) })));
+        const version = ++versionCarga.current;
+        try {
+            const [data, cerradas, cabeceras] = await Promise.all([
+                listAlmacenMovimientos(),
+                listOrdenesCerradas().catch(() => []),
+                listAlmacenSolicitudes()
+            ]);
+            if (version !== versionCarga.current) return;
+            setRows(data.map(r => ({ ...r, orden_produccion: claveOP(r.orden_produccion) })));
+            setSolicitudes(cabeceras);
+            setErrorCarga(null);
 
-        // Obtener órdenes únicas
-        const setOrdenes = Array.from(
-            new Set(data.map(r => claveOP(r.orden_produccion)).filter(Boolean))
-        );
-        setOrdenesUnicas(setOrdenes);
+            // Obtener órdenes únicas
+            const setOrdenes = Array.from(
+                new Set([...data, ...cabeceras].map(r => claveOP(r.orden_produccion)).filter(Boolean))
+            );
+            setOrdenesUnicas(setOrdenes);
 
-        // Indexar OPs cerradas
-        setOrdenesCerradas(
-            new Set((cerradas || []).map(c => claveOP(c.orden_produccion)))
-        );
+            // Indexar OPs cerradas
+            setOrdenesCerradas(
+                new Set((cerradas || []).map(c => claveOP(c.orden_produccion)))
+            );
+        } catch (_) {
+            if (version === versionCarga.current) setErrorCarga("No se pudieron actualizar los movimientos y solicitudes. Reintenta la consulta.");
+        }
     };
 
     // Helpers OP cerrada
@@ -378,7 +407,7 @@ export default function AlmacenPage() {
 
     const cerrarDrawer = () => {
         if (envioSolicitud.current) return;
-        if ((asignacionPendiente || resultadoSolicitud) && !window.confirm("Hay un resultado de guardado pendiente. ¿Cerrar y descartar este seguimiento local? Los movimientos guardados se conservan.")) return;
+        if ((asignacionPendiente || resultadoSolicitud) && !window.confirm("Hay un resultado de guardado pendiente. ¿Cerrar y descartar este seguimiento local? Las solicitudes guardadas se conservan.")) return;
         setAsignacionPendiente(null);
         setResultadoSolicitud(null);
         setMovimientoIncierto(false);
@@ -475,8 +504,8 @@ export default function AlmacenPage() {
             return;
         }
 
-        if (listaPiezas.length === 0) {
-            alert("Agrega al menos una pieza.");
+        if (listaPiezas.some(p => !p.numero_parte || !Number.isFinite(Number(p.cantidad)) || Number(p.cantidad) <= 0)) {
+            alert("Cada pieza debe tener número de parte y cantidad válida.");
             return;
         }
 
@@ -490,7 +519,7 @@ export default function AlmacenPage() {
         const actual = responsablesPorOP?.[ordenIngresada]?.responsable_id ?? null;
         const cambiarAsignacion = puedeAsignarOP && seleccionOPModificada && (!servicioDisponible || actual !== responsableId);
         // Una OP nueva con selección explícita también requiere una asignación real.
-        const opNueva = !rows.some(r => claveOP(r.orden_produccion) === ordenIngresada);
+        const opNueva = !ordenesUnicas.includes(ordenIngresada);
         const asignar = cambiarAsignacion || (puedeAsignarOP && opNueva && responsableId !== null);
         if (asignar && !opNueva && !window.confirm("La reasignación afectará a todos los movimientos de esta OP. ¿Continuar?")) return;
         envioSolicitud.current = true;
@@ -498,30 +527,27 @@ export default function AlmacenPage() {
         ++versionResponsables.current;
         setGuardandoSolicitud(true);
         setResultadoSolicitud(null);
-        let confirmados = 0;
         const piezas = [...listaPiezas];
         try {
-            // El catálogo no condiciona la creación. El PUT valida el ID en backend.
-            for (const pieza of piezas) {
-                try {
-                    await createAlmacenMovimiento({
-                        persona: nombrePersona,
-                        estacion: formHeader.estacion,
-                        orden_produccion: ordenIngresada,
-                        concepto_liberacion: formHeader.concepto_liberacion,
+            try {
+                await createAlmacenSolicitud({
+                    persona: nombrePersona,
+                    estacion: formHeader.estacion,
+                    orden_produccion: ordenIngresada,
+                    concepto_liberacion: formHeader.concepto_liberacion || null,
+                    piezas: piezas.map(pieza => ({
                         numero_parte: pieza.numero_parte,
                         descripcion: pieza.descripcion,
-                        cantidad: pieza.cantidad
-                    });
-                    confirmados++;
-                    setListaPiezas(piezas.slice(confirmados));
-                } catch (error) {
-                    const incierto = !error.response || error.response.status >= 500;
-                    setMovimientoIncierto(incierto ? { pieza, op: ordenIngresada } : false);
-                    if (incierto) setListaPiezas(piezas.slice(confirmados + 1));
-                    setResultadoSolicitud(`${confirmados} movimientos confirmados de ${piezas.length}. No se cambió la asignación. ${incierto ? "El último envío tiene resultado desconocido; revisa Movimientos antes de resolver los pendientes. No vuelvas a enviarlo sin comprobarlo." : "Los pendientes permanecen en el formulario para reintento explícito."}`);
-                    return;
-                }
+                        cantidad: Number(pieza.cantidad)
+                    }))
+                });
+            } catch (error) {
+                const incierto = !error.response;
+                setMovimientoIncierto(incierto ? { op: ordenIngresada } : false);
+                setResultadoSolicitud(incierto
+                    ? "Resultado desconocido. Verifica si la solicitud se guardó antes de volver a guardar. No se cambió el Responsable de OP."
+                    : `No se creó la solicitud. ${error.response?.data?.error || "Revisa los datos y vuelve a intentarlo."}`);
+                return;
             }
             if (asignar) {
                 const pendiente = { op: ordenIngresada, responsableId };
@@ -530,7 +556,7 @@ export default function AlmacenPage() {
                     await guardarResponsableOP(ordenIngresada, responsableId, false, true);
                     setAsignacionPendiente(null);
                 } catch (_) {
-                    setResultadoSolicitud("Movimientos guardados; asignación pendiente de confirmar");
+                    setResultadoSolicitud("Solicitud guardada; asignación pendiente de confirmar");
                     return;
                 }
             }
@@ -538,9 +564,10 @@ export default function AlmacenPage() {
             setDrawerOpen(false);
             setSeleccionOPModificada(false);
             opFormularioAnterior.current = null;
-            alert(asignar ? "Movimientos y asignación guardados." : "Movimientos guardados. La asignación de OP no se modificó.");
+            alert(asignar ? "Solicitud y asignación guardadas." : "Solicitud guardada. La asignación de OP no se modificó.");
         } catch (_) {
-            setResultadoSolicitud(`${confirmados} movimientos confirmados. Revisa el resultado antes de continuar.`);
+            setMovimientoIncierto({ op: ordenIngresada });
+            setResultadoSolicitud("Revisa el resultado de la solicitud antes de continuar. No vuelvas a enviarla sin comprobarlo.");
         } finally {
             bloqueosOP.current.delete(ordenIngresada);
             envioSolicitud.current = false;
@@ -671,9 +698,9 @@ export default function AlmacenPage() {
         }
     };
 
-    const filtrados = rows.filter((r) => {
+    const filtrados = filas.filter((r) => {
         const matchOrden = filtroOrden === "" ? true : r.orden_produccion === filtroOrden;
-        const matchMovimiento = filtroMovimiento === "" ? true : r.estatus_movimiento === filtroMovimiento;
+        const matchMovimiento = filtroMovimiento === "" ? true : !r.sinPiezas && r.estatus_movimiento === filtroMovimiento;
         return matchOrden && matchMovimiento;
     });
 
@@ -682,6 +709,7 @@ export default function AlmacenPage() {
 
     return (
         <div className="space-y-5">
+            {errorCarga && <div role="alert" className="p-3 bg-amber-50 text-amber-900 rounded">{errorCarga} <button className="underline" onClick={load}>Reintentar</button></div>}
             {errorResponsablesOP && <div className="p-3 bg-amber-50 text-amber-900 rounded" role="status">
                 {errorResponsablesOP} Los movimientos siguen disponibles. No se cambiarán asignaciones.
                 <button type="button" className="underline ml-2" disabled={loadingResponsablesOP} onClick={cargarAsignacionesOP}>Reintentar consulta</button>
@@ -917,14 +945,14 @@ export default function AlmacenPage() {
                         <tbody className="divide-y divide-slate-100">
                             {paginated.map((r) => (
                                 <tr
-                                    key={r.id}
+                                    key={r.sinPiezas ? `solicitud-op-${r.orden_produccion}` : `movimiento-${r.id}`}
                                     className="hover:bg-blue-50/50 transition cursor-pointer"
                                     onClick={() => {
                                         setDetalle(r);
                                         setModalOpen(true);
                                     }}
                                 >
-                                    <td className="px-4 py-3 font-medium text-slate-800">{r.id}</td>
+                                    <td className="px-4 py-3 font-medium text-slate-800">{r.sinPiezas ? "—" : r.id}</td>
 
                                     <td className="px-4 py-3">
                                         <div className="font-semibold text-slate-800">{textoResponsableOP(r.orden_produccion)}</div>
@@ -951,26 +979,27 @@ export default function AlmacenPage() {
 
                                     <td className="px-4 py-3">
                                         <span className="font-mono bg-slate-50 px-2 py-1 rounded text-slate-700 border border-slate-200 text-xs">
-                                            {r.numero_parte}
+                                            {r.sinPiezas ? "Sin piezas" : r.numero_parte}
                                         </span>
                                     </td>
 
                                     <td className="px-4 py-3 text-center font-semibold">
-                                        {Number(r.cantidad).toFixed(2)}
+                                        {r.sinPiezas ? "—" : Number(r.cantidad).toFixed(2)}
                                     </td>
 
                                     <td className="px-4 py-3 text-center">
-                                        <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                        {r.sinPiezas ? "—" : <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
                                             r.status === "PENDIENTE"
                                                 ? "bg-amber-100 text-amber-800 border border-amber-300"
                                                 : "bg-emerald-100 text-emerald-800 border border-emerald-300"
                                         }`}>
                                             {r.status}
-                                        </span>
+                                        </span>}
                                     </td>
 
                                     <td className="px-4 py-3">
-                                        {(role === "admin" || role === "almacen" || role === "solicitante") && (
+                                        {r.sinPiezas && "—"}
+                                        {!r.sinPiezas && (role === "admin" || role === "almacen" || role === "solicitante") && (
                                             loadingStatusId === r.id ? (
                                                 <div className="flex items-center gap-2 text-xs text-slate-500">
                                                     <svg
@@ -1035,7 +1064,7 @@ export default function AlmacenPage() {
                                         className="px-4 py-3"
                                         onClick={(e) => e.stopPropagation()}
                                     >
-                                        {(role === "admin" || role === "almacen") && (
+                                        {!r.sinPiezas && (role === "admin" || role === "almacen") && (
                                             <div className="flex items-center gap-2">
 
                                                 {/* EDITAR */}
@@ -1186,27 +1215,34 @@ export default function AlmacenPage() {
                             <div className="text-sm bg-slate-50 p-3 rounded" aria-live="polite">
                                 Responsable actual de la OP: {textoResponsableOP(formHeader.orden_produccion)}
                                 <p>{puedeAsignarOP && !errorResponsablesOP && responsablesPorOP
-                                    ? "Una selección diferente cambiará el responsable de toda la OP después de guardar las piezas."
-                                    : "La selección de persona solo se registra en los movimientos; no modifica la asignación de OP."}</p>
+                                    ? "Una selección diferente cambiará el responsable de toda la OP después de guardar la solicitud."
+                                    : "La selección de persona se registra en la solicitud y sus movimientos; no modifica la asignación de OP."}</p>
                             </div>
                             {resultadoSolicitud && <div role="status" className="p-3 bg-amber-50 text-amber-900 rounded">
                                 <p>{resultadoSolicitud}</p>
                                 {movimientoIncierto && <div className="mt-2 space-y-2 border border-amber-400 p-3">
-                                    <p>Resultado desconocido, separado de las piezas pendientes: OP {movimientoIncierto.op}, pieza {movimientoIncierto.pieza.numero_parte}, cantidad {movimientoIncierto.pieza.cantidad}.</p>
-                                    <p>Revisa en Movimientos antes de decidir. No se reenviará automáticamente.</p>
+                                    <p>Resultado desconocido de la solicitud completa para OP {movimientoIncierto.op}.</p>
+                                    <p>Verifica la solicitud antes de decidir. No se reenviará automáticamente ni se asignará Responsable.</p>
                                     <button type="button" className="btn" onClick={() => {
-                                        if (window.confirm("¿Confirmaste que esta pieza sí quedó guardada en el servidor?")) setMovimientoIncierto(false);
+                                        if (window.confirm("¿Verificaste que la solicitud completa quedó guardada? La asignación de Responsable debe revisarse desde la OP.")) {
+                                            setMovimientoIncierto(false);
+                                            setResultadoSolicitud(null);
+                                            resetFormNuevaSolicitud();
+                                            setDrawerOpen(false);
+                                            load();
+                                            cargarAsignacionesOP();
+                                        }
                                     }}>Confirmé que se guardó</button>
                                     <button type="button" className="btn ml-2" onClick={() => {
-                                        if (window.confirm("¿Confirmaste que NO se guardó? Si sí se guardó, reenviarla duplicará el movimiento.")) {
-                                            setListaPiezas(prev => [movimientoIncierto.pieza, ...prev]);
+                                        if (window.confirm("¿Verificaste que la solicitud NO se guardó? Reenviarla si ya existe duplicará la solicitud y sus piezas.")) {
                                             setMovimientoIncierto(false);
+                                            setResultadoSolicitud(null);
                                         }
-                                    }}>Confirmé que no se guardó; pasar a pendientes</button>
+                                    }}>Confirmé que no se guardó; habilitar guardado</button>
                                 </div>}
                             </div>}
                             {asignacionPendiente && <div className="p-3 border rounded space-y-2">
-                                <p>OP {asignacionPendiente.op}: reintentar solamente la asignación. Las piezas ya están guardadas.</p>
+                                <p>OP {asignacionPendiente.op}: reintentar solamente la asignación. La solicitud ya está guardada; no se reenviará.</p>
                                 <Autocomplete options={[opcionSinResponsable, ...responsablesActivos]}
                                     value={[opcionSinResponsable, ...listaResponsables].find(u => u.id === asignacionPendiente.responsableId) || null}
                                     getOptionLabel={option => option.nombre || ""}
@@ -1224,13 +1260,17 @@ export default function AlmacenPage() {
                                     try {
                                         await guardarResponsableOP(asignacionPendiente.op, asignacionPendiente.responsableId, true);
                                         setAsignacionPendiente(null);
-                                        setResultadoSolicitud("Movimientos y asignación confirmados.");
+                                        setResultadoSolicitud(null);
+                                        resetFormNuevaSolicitud();
+                                        setDrawerOpen(false);
+                                        load();
+                                        alert("Solicitud y asignación confirmadas.");
                                         cargarAsignacionesOP();
                                     } catch (_) { /* No reenviar movimientos. */ }
                                     finally { envioSolicitud.current = false; setGuardandoSolicitud(false); }
                                 }}>Consultar y reintentar solo asignación</button>
                             </div>}
-                            <fieldset disabled={guardandoSolicitud || Boolean(asignacionPendiente)} className="space-y-6">
+                            <fieldset disabled={guardandoSolicitud || Boolean(asignacionPendiente) || Boolean(movimientoIncierto)} className="space-y-6">
 
                             {/* ----------- DATOS GENERALES ----------- */}
                             <div className="card space-y-4">
@@ -1443,7 +1483,7 @@ export default function AlmacenPage() {
                             {/* ----------- AGREGAR PIEZAS ----------- */}
                             <div className="card space-y-4">
                                 <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                                    Agregar pieza
+                                    Agregar pieza <span className="normal-case font-normal">· Opcional</span>
                                 </h4>
 
                                 <input
@@ -1582,9 +1622,13 @@ export default function AlmacenPage() {
                         <h3 className="text-lg font-semibold text-slate-900 mb-4">Detalle de solicitud</h3>
 
                         <div className="space-y-3 text-sm">
+                            {detalle.sinPiezas && <div>
+                                <span className="font-semibold text-slate-500">OP: </span>{detalle.orden_produccion}
+                                <p><span className="font-semibold text-slate-500">Concepto: </span>{detalle.concepto_liberacion || "—"}</p>
+                            </div>}
 
                             <div>
-                                <span className="font-semibold text-slate-500">Persona registrada en el movimiento: </span>
+                                <span className="font-semibold text-slate-500">{detalle.sinPiezas ? "Persona registrada en la solicitud: " : "Persona registrada en el movimiento: "}</span>
                                 <span className="text-slate-800">{detalle.persona}</span>
                             </div>
 
@@ -1596,7 +1640,7 @@ export default function AlmacenPage() {
                             <div>
                                 <span className="font-semibold text-slate-500">Número de parte: </span>
                                 <span className="font-mono bg-slate-50 px-2 py-1 rounded border border-slate-200 text-xs">
-                                    {detalle.numero_parte}
+                                    {detalle.sinPiezas ? "Sin piezas" : detalle.numero_parte}
                                 </span>
                             </div>
 
@@ -1607,7 +1651,7 @@ export default function AlmacenPage() {
 
                             <div>
                                 <span className="font-semibold text-slate-500">Cantidad: </span>
-                                <span className="font-semibold">{Number(detalle.cantidad).toFixed(2)}</span>
+                                <span className="font-semibold">{detalle.sinPiezas ? "—" : Number(detalle.cantidad).toFixed(2)}</span>
                             </div>
 
                             <div>

@@ -1,7 +1,7 @@
 // src/pages/RegistroAlmacen.jsx
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createAlmacenMovimiento, listAlmacenMovimientos, listOrdenesCerradas, getResponsablePorOrden, normalizarOrdenProduccion } from "../lib/api.js";
+import { createAlmacenMovimiento, listAlmacenMovimientos, listOrdenesAlmacen, listOrdenesCerradas, getResponsablePorOrden, normalizarOrdenProduccion } from "../lib/api.js";
 import { useAuth } from "../auth/AuthProvider.jsx";
 
 // Formatea cualquier valor de OP para que en la interfaz siempre se visualice con el prefijo "OP" (ej. "OP3889")
@@ -50,7 +50,7 @@ export default function RegistroAlmacen() {
   }, []);
 
   // Consulta React Query para obtener movimientos reales de Almacén
-  // Se carga siempre (no solo con OP activa) porque de aquí se derivan las OP existentes
+  // Alimenta las piezas históricas y la tarjeta de la OP activa.
   const {
     data: movimientosBackend = [],
     isLoading: isLoadingMovimientos,
@@ -69,14 +69,20 @@ export default function RegistroAlmacen() {
     staleTime: 1000 * 5,
   });
 
-  // OP existentes: únicamente las que ya tienen movimientos registrados en backend
+  // Incluye OP históricas y cabeceras nuevas, aunque no tengan piezas.
+  const { data: ordenesBackend = [], isError: errorOrdenes, isFetching: consultandoOrdenes, refetch: refetchOrdenes } = useQuery({
+    queryKey: ["almacen_ordenes"],
+    queryFn: listOrdenesAlmacen,
+    staleTime: 1000 * 5,
+    refetchInterval: 10000,
+  });
   const ordenesExistentes = useMemo(() => {
     return new Set(
-      (movimientosBackend || [])
-        .map((m) => normalizarOrdenProduccion(m.orden_produccion))
+      ordenesBackend
+        .map((o) => normalizarOrdenProduccion(o.orden_produccion))
         .filter(Boolean)
     );
-  }, [movimientosBackend]);
+  }, [ordenesBackend]);
 
   // OP cerradas conocidas de forma proactiva (independiente del 409 reactivo)
   const ordenesCerradasSet = useMemo(() => {
@@ -192,6 +198,11 @@ export default function RegistroAlmacen() {
     const opVisual = `OP${opLimpia}`;
     const ahora = new Date();
 
+    if (errorOrdenes || (consultandoOrdenes && !ordenesExistentes.has(opLimpia))) {
+      showToast(errorOrdenes ? "No se pudieron consultar las OP existentes. Reintenta la consulta." : "Consultando OP existentes; vuelve a intentar al terminar.", "warning");
+      refetchOrdenes();
+      return;
+    }
     if (!ordenesExistentes.has(opLimpia)) {
       showToast(`La OP ${opLimpia} no existe. Créala primero desde Nueva solicitud.`, "error");
       setHistorialEscaneos((prev) => [
@@ -500,6 +511,9 @@ export default function RegistroAlmacen() {
 
   return (
     <div className="space-y-6">
+      {errorOrdenes && <div role="alert" className="p-3 bg-amber-50 text-amber-900 rounded">
+        No se pudieron consultar las OP existentes. <button className="underline" onClick={() => refetchOrdenes()}>Reintentar</button>
+      </div>}
       {/* ─── PANEL SUPERIOR INDUSTRIAL OSCURO ─── */}
       <div className="bg-slate-950 border border-slate-800 text-slate-100 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
         {/* Glow de acento industrial */}
@@ -855,7 +869,7 @@ export default function RegistroAlmacen() {
           {opActiva && (
             <div className="flex items-center gap-3 text-xs text-slate-500">
               <button
-                onClick={() => refetchMovimientos()}
+                onClick={() => { refetchMovimientos(); refetchOrdenes(); }}
                 className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 cursor-pointer"
                 title="Sincronizar con el servidor"
               >

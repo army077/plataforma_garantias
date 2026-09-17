@@ -121,6 +121,16 @@ export const listAlmacenMovimientos = async () => {
   return data;
 };
 
+// Solicitudes con cabecera y cero o más piezas.
+export const createAlmacenSolicitud = async (payload) =>
+  (await api.post("/almacen/solicitudes", { ...payload, orden_produccion: normalizarOrdenProduccion(payload.orden_produccion) })).data;
+
+export const listAlmacenSolicitudes = async () =>
+  (await api.get("/almacen/solicitudes")).data;
+
+export const listOrdenesAlmacen = async () =>
+  (await api.get("/almacen/ordenes")).data;
+
 // POST: crear movimiento (solicitud simple)
 export const createAlmacenMovimiento = async (payload) => {
   // payload:
