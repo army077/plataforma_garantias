@@ -458,7 +458,7 @@ export default function AlmacenPage() {
     }, []);
 
     const agregarPiezaALista = () => {
-        if (!currentPart.numero_parte || currentPart.cantidad <= 0) {
+        if (!currentPart.numero_parte.trim() || !Number.isFinite(Number(currentPart.cantidad)) || Number(currentPart.cantidad) <= 0) {
             alert("Debes agregar número de parte y cantidad válida.");
             return;
         }
@@ -504,7 +504,16 @@ export default function AlmacenPage() {
             return;
         }
 
-        if (listaPiezas.some(p => !p.numero_parte || !Number.isFinite(Number(p.cantidad)) || Number(p.cantidad) <= 0)) {
+        // La cantidad inicial 1 no implica que se haya iniciado una pieza.
+        const hayPiezaPendiente = Boolean(
+            currentPart.numero_parte.trim() || currentPart.descripcion.trim() || search.trim()
+        ) || Number(currentPart.cantidad) !== 1;
+        if (hayPiezaPendiente) {
+            alert("Hay una pieza pendiente. Completa sus datos y pulsa 'Agregar pieza', o limpia la captura antes de guardar.");
+            return;
+        }
+
+        if (listaPiezas.some(p => !p.numero_parte.trim() || !Number.isFinite(Number(p.cantidad)) || Number(p.cantidad) <= 0)) {
             alert("Cada pieza debe tener número de parte y cantidad válida.");
             return;
         }
@@ -1549,6 +1558,7 @@ export default function AlmacenPage() {
                                 />
 
                                 <button
+                                    type="button"
                                     className="btn w-full"
                                     onClick={agregarPiezaALista}
                                 >
@@ -1590,6 +1600,7 @@ export default function AlmacenPage() {
                             {/* BOTÓN FINAL */}
                             <div className="mt-6 pt-4 border-t border-slate-200">
                                 <button
+                                    type="button"
                                     onClick={handleCrearTodo}
                                     disabled={guardandoSolicitud || Boolean(asignacionPendiente) || movimientoIncierto}
                                     className="btn btn-primary w-full py-3 flex items-center justify-center gap-2"

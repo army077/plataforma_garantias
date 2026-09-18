@@ -103,7 +103,13 @@ router.post("/solicitudes", autorizarRoles(ROLES_SOLICITUDES_ALMACEN), async (re
         if (error.codigo === "OP_CERRADA") {
             return res.status(409).json({ error: error.message, codigo: error.codigo, orden_produccion: orden });
         }
-        console.error("Error creando solicitud de almacén:", error);
+        console.error("Error POST /almacen/solicitudes", {
+            message: error?.message,
+            code: error?.code,
+            constraint: error?.constraint,
+            detail: error?.detail,
+            stack: error?.stack,
+        });
         return res.status(500).json({ error: "No se pudo guardar la solicitud completa." });
     }
 });
