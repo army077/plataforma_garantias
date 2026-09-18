@@ -15,7 +15,8 @@ import {
     updateAlmacenMovimiento,
     deleteAlmacenMovimiento,
     listOrdenesCerradas,
-    toggleOrdenProduccion
+    abrirOrdenProduccion,
+    cerrarMovimientosPorOrden
 } from "../lib/api.js";
 import EstadoBadge from "../components/EstadoBadge";
 import { useAuth } from "../auth/AuthProvider.jsx";
@@ -148,6 +149,7 @@ export default function AlmacenPage() {
     };
     const navigate = useNavigate();
 
+    const [ordenesCerradas, setOrdenesCerradas] = useState(new Set());
     const [rows, setRows] = useState([]);
     const [solicitudes, setSolicitudes] = useState([]);
     const [errorCarga, setErrorCarga] = useState(null);
@@ -165,8 +167,13 @@ export default function AlmacenPage() {
                 vacias.set(op, { ...datos, solicitud_id: id, orden_produccion: op, sinPiezas: true });
             }
         }
+        for (const op of ordenesCerradas) {
+            if (!conMovimientos.has(op) && !vacias.has(op)) {
+                vacias.set(op, { orden_produccion: op, sinPiezas: true, soloCandado: true });
+            }
+        }
         return [...vacias.values(), ...rows];
-    }, [rows, solicitudes]);
+    }, [rows, solicitudes, ordenesCerradas]);
     const [page, setPage] = useState(1);
     const [pageSize] = useState(10);
     const [drawerOpen, setDrawerOpen] = useState(false);
@@ -190,8 +197,7 @@ export default function AlmacenPage() {
     const [indiceSugerenciaActiva, setIndiceSugerenciaActiva] = useState(-1);
 
 
-    // OPs cerradas (no admiten nuevas solicitudes)
-    const [ordenesCerradas, setOrdenesCerradas] = useState(new Set());
+    // OPs cerradas: el estado se declara antes de construir las filas.
 
     // Modal: alternar candado (cerrar/abrir OP) desde la fila
     const [toggleModalOpen, setToggleModalOpen] = useState(false);
@@ -283,7 +289,7 @@ export default function AlmacenPage() {
         try {
             const [data, cerradas, cabeceras] = await Promise.all([
                 listAlmacenMovimientos(),
-                listOrdenesCerradas().catch(() => []),
+                listOrdenesCerradas(),
                 listAlmacenSolicitudes()
             ]);
             if (version !== versionCarga.current) return;
@@ -586,6 +592,11 @@ export default function AlmacenPage() {
         }
     };
 
+    const mostrarErrorMovimiento = async (error, mensaje) => {
+        alert(error?.response?.data?.error || mensaje);
+        if (error?.response?.data?.codigo === "OP_CERRADA") await load();
+    };
+
     // ---- Atender movimiento (sin PIN, con identidad de useAuth) ----
     const handleAtender = async (movimiento) => {
         const atendio = user?.name || user?.email;
@@ -600,8 +611,7 @@ export default function AlmacenPage() {
             alert("Movimiento atendido correctamente.");
         } catch (err) {
             console.error(err);
-            const msg = err?.response?.data?.error || "Error al atender el movimiento.";
-            alert(msg);
+            await mostrarErrorMovimiento(err, "Error al atender el movimiento.");
         }
     };
 
@@ -617,7 +627,11 @@ export default function AlmacenPage() {
     const confirmarToggleOP = async () => {
         if (!toggleOrden) return;
         try {
-            await toggleOrdenProduccion(toggleOrden);
+            if (toggleProximoEstado === "ABIERTA") {
+                await abrirOrdenProduccion(toggleOrden);
+            } else {
+                await cerrarMovimientosPorOrden(toggleOrden);
+            }
             setToggleModalOpen(false);
             setToggleOrden("");
             await load();
@@ -965,7 +979,7 @@ export default function AlmacenPage() {
 
                                     <td className="px-4 py-3">
                                         <div className="font-semibold text-slate-800">{textoResponsableOP(r.orden_produccion)}</div>
-                                        <div className="text-xs text-slate-400">Estación {r.estacion}</div>
+                                        <div className="text-xs text-slate-400">Estación {r.estacion || "—"}</div>
                                         {puedeAsignarOP && claveOP(r.orden_produccion) && (
                                             <button type="button" className="text-xs text-blue-700 underline disabled:opacity-50"
                                                 disabled={!responsablesPorOP || Boolean(errorResponsablesOP) || operacionesResponsablePorOP[claveOP(r.orden_produccion)]?.loading || guardandoSolicitud}
@@ -984,7 +998,10 @@ export default function AlmacenPage() {
                                         {operacionesResponsablePorOP[claveOP(r.orden_produccion)]?.error && <p className="text-xs text-red-700">{operacionesResponsablePorOP[claveOP(r.orden_produccion)].error}</p>}
                                     </td>
 
-                                    <td className="px-4 py-3 text-slate-700">{r.orden_produccion}</td>
+                                    <td className="px-4 py-3 text-slate-700">
+                                        {r.orden_produccion}
+                                        {esOrdenCerrada(r.orden_produccion) && <span className="block text-xs font-semibold text-red-700">Cerrada</span>}
+                                    </td>
 
                                     <td className="px-4 py-3">
                                         <span className="font-mono bg-slate-50 px-2 py-1 rounded text-slate-700 border border-slate-200 text-xs">
@@ -1033,6 +1050,7 @@ export default function AlmacenPage() {
                                             ) : (
                                                 <select
                                                     className={`border rounded-lg px-2 py-1 text-xs font-semibold ${getMovimientoClasses(r.estatus_movimiento)}`}
+                                                    disabled={esOrdenCerrada(r.orden_produccion)}
                                                     value={r.estatus_movimiento}
                                                     onChange={(e) => {
                                                         e.stopPropagation();
@@ -1045,12 +1063,12 @@ export default function AlmacenPage() {
                                                         ));
                                                         setLoadingStatusId(r.id);
                                                         actualizarEstatusMovimiento(r.id, nuevo)
-                                                            .catch(() => {
+                                                            .catch((error) => {
                                                                 // Revertir si el backend falla
                                                                 setRows(prev => prev.map(row =>
                                                                     row.id === r.id ? { ...row, estatus_movimiento: anterior } : row
                                                                 ));
-                                                                alert("Error al actualizar el estatus");
+                                                                return mostrarErrorMovimiento(error, "Error al actualizar el estatus");
                                                             })
                                                             .finally(() => {
                                                                 setLoadingStatusId(null);
@@ -1079,6 +1097,7 @@ export default function AlmacenPage() {
                                                 {/* EDITAR */}
                                                 <button
                                                     className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition"
+                                                    disabled={esOrdenCerrada(r.orden_produccion)}
                                                     title="Editar"
                                                     onClick={() => { setEditForm(r); setEditModalOpen(true); }}
                                                 >
@@ -1088,16 +1107,38 @@ export default function AlmacenPage() {
                                                 {/* ELIMINAR */}
                                                 <button
                                                     className="p-1.5 rounded-lg border border-red-300 bg-red-50 hover:bg-red-100 transition"
+                                                    disabled={esOrdenCerrada(r.orden_produccion)}
                                                     title="Eliminar"
                                                     onClick={async () => {
                                                         if (!confirm("¿Eliminar registro?")) return;
-                                                        await deleteAlmacenMovimiento(r.id);
-                                                        load();
+                                                        try {
+                                                            await deleteAlmacenMovimiento(r.id);
+                                                            await load();
+                                                        } catch (error) {
+                                                            await mostrarErrorMovimiento(error, "Error al eliminar el movimiento.");
+                                                        }
                                                     }}
                                                 >
                                                     <DeleteIcon className="text-red-700" fontSize="small" />
                                                 </button>
 
+                                                {/* ATENDER */}
+                                                {r.status === "PENDIENTE" && !esOrdenCerrada(r.orden_produccion) && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleAtender(r);
+                                                        }}
+                                                        className="px-3 py-1 text-xs rounded-lg border border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 transition whitespace-nowrap"
+                                                    >
+                                                        Atender
+                                                    </button>
+                                                )}
+
+                                            </div>
+                                        )}
+                                        {(role === "admin" || role === "almacen") &&
+                                            (!r.sinPiezas || esOrdenCerrada(r.orden_produccion)) && <div className="mt-1">
                                                 {/* CANDADO OP */}
                                                 {(() => {
                                                     const cerrada = esOrdenCerrada(r.orden_produccion);
@@ -1136,6 +1177,7 @@ export default function AlmacenPage() {
                                                             disabled={!puedeAccionar}
                                                             onClick={() => puedeAccionar && abrirToggleModal(r.orden_produccion)}
                                                         >
+                                                            <span className="text-xs mr-1">{cerrada ? "Reabrir OP" : "Cerrar OP"}</span>
                                                             {cerrada
                                                                 ? <LockIcon fontSize="small" />
                                                                 : <LockOpenIcon fontSize="small" />}
@@ -1143,21 +1185,7 @@ export default function AlmacenPage() {
                                                     );
                                                 })()}
 
-                                                {/* ATENDER */}
-                                                {r.status === "PENDIENTE" && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleAtender(r);
-                                                        }}
-                                                        className="px-3 py-1 text-xs rounded-lg border border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 transition whitespace-nowrap"
-                                                    >
-                                                        Atender
-                                                    </button>
-                                                )}
-
-                                            </div>
-                                        )}
+                                        </div>}
                                     </td>
 
                                 </tr>
@@ -1640,12 +1668,12 @@ export default function AlmacenPage() {
 
                             <div>
                                 <span className="font-semibold text-slate-500">{detalle.sinPiezas ? "Persona registrada en la solicitud: " : "Persona registrada en el movimiento: "}</span>
-                                <span className="text-slate-800">{detalle.persona}</span>
+                                <span className="text-slate-800">{detalle.persona || "—"}</span>
                             </div>
 
                             <div>
                                 <span className="font-semibold text-slate-500">Estación: </span>
-                                <span>{detalle.estacion}</span>
+                                <span>{detalle.estacion || "—"}</span>
                             </div>
 
                             <div>
@@ -1668,11 +1696,11 @@ export default function AlmacenPage() {
                             <div>
                                 <span className="font-semibold text-slate-500">Fecha solicitud: </span>
                                 <span className="text-slate-800">
-                                    {new Date(detalle.creado_en).toLocaleDateString("es-MX", {
+                                    {detalle.creado_en ? new Date(detalle.creado_en).toLocaleDateString("es-MX", {
                                         day: "numeric",
                                         month: "short",
                                         year: "numeric",
-                                    })}
+                                    }) : "—"}
                                 </span>
                             </div>
 
@@ -1771,10 +1799,15 @@ export default function AlmacenPage() {
 
                             <button
                                 className="btn btn-primary flex-1"
+                                disabled={esOrdenCerrada(editForm.orden_produccion) || rows.some(r => r.id === editForm.id && esOrdenCerrada(r.orden_produccion))}
                                 onClick={async () => {
-                                    await updateAlmacenMovimiento(editForm.id, editForm);
-                                    setEditModalOpen(false);
-                                    load();
+                                    try {
+                                        await updateAlmacenMovimiento(editForm.id, editForm);
+                                        setEditModalOpen(false);
+                                        await load();
+                                    } catch (error) {
+                                        await mostrarErrorMovimiento(error, "Error al editar el movimiento.");
+                                    }
                                 }}
                             >
                                 Guardar cambios

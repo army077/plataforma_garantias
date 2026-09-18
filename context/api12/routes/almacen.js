@@ -179,6 +179,35 @@ async function buscarUsuarioPorPin(pin) {
     return null;
 }
 
+// Consulta la OP real antes de cualquier escritura sobre un movimiento.
+async function movimientoEditable(id, res, ordenDestino) {
+    const result = await pool.query(
+        `SELECT m.orden_produccion, m.solicitud_id, s.id AS cabecera_id,
+                s.orden_produccion AS orden_cabecera
+         FROM almacen_movimientos m
+         LEFT JOIN almacen_solicitudes s ON s.id = m.solicitud_id
+         WHERE m.id = $1`, [id]
+    );
+    if (!result.rowCount) {
+        res.status(404).json({ error: "Movimiento no encontrado" });
+        return null;
+    }
+    const movimiento = result.rows[0];
+    const ordenes = new Set([normalizarOrdenProduccion(movimiento.orden_produccion)]);
+    if (ordenDestino !== undefined) ordenes.add(normalizarOrdenProduccion(ordenDestino));
+    for (const orden of ordenes) {
+        if (await ordenEstaCerrada(orden)) {
+            res.status(409).json({
+                error: "La OP está cerrada. Reábrela antes de modificar sus movimientos.",
+                codigo: "OP_CERRADA",
+                orden_produccion: orden
+            });
+            return null;
+        }
+    }
+    return movimiento;
+}
+
 // Devuelve true si la orden está marcada como cerrada.
 async function ordenEstaCerrada(orden) {
     if (!orden) return false;
@@ -587,6 +616,8 @@ router.post("/atender/:id", async (req, res) => {
     const { id } = req.params;
     const { atendio } = req.body;
 
+    if (!(await movimientoEditable(id, res))) return;
+
     const result = await pool.query(
       `UPDATE almacen_movimientos
        SET status = 'ATENDIDO',
@@ -642,6 +673,8 @@ router.post("/atender_pin/:id", async (req, res) => {
         }
 
         // 2. Actualizar movimiento
+        if (!(await movimientoEditable(id, res))) return;
+
         const result = await pool.query(
             `UPDATE almacen_movimientos
              SET status = 'ATENDIDO',
@@ -703,6 +736,8 @@ router.put("/movimientos/:id/status", async (req, res) => {
   const { status } = req.body;
 
   try {
+    if (!(await movimientoEditable(id, res))) return;
+
     const q = await pool.query(
       `UPDATE almacen_movimientos
        SET estatus_movimiento = $1
@@ -1040,6 +1075,8 @@ router.post("/cambiar_status_pin/:id", async (req, res) => {
         }
 
         // Actualizar el movimiento
+        if (!(await movimientoEditable(id, res))) return;
+
         const result = await pool.query(
             `UPDATE almacen_movimientos
              SET estatus_movimiento = $1,
@@ -1093,19 +1130,9 @@ router.put("/movimientos/:id", async (req, res) => {
   } = req.body;
 
   try {
-    const actual = await pool.query(
-      `SELECT m.solicitud_id, s.id AS cabecera_id,
-              s.orden_produccion AS orden_cabecera
-       FROM almacen_movimientos m
-       LEFT JOIN almacen_solicitudes s ON s.id = m.solicitud_id
-       WHERE m.id = $1`,
-      [id]
-    );
-    if (actual.rowCount === 0) {
-      return res.status(404).json({ error: "Movimiento no encontrado" });
-    }
+    const movimiento = await movimientoEditable(id, res, orden_produccion);
+    if (!movimiento) return;
 
-    const movimiento = actual.rows[0];
     if (movimiento.solicitud_id != null &&
         (movimiento.cabecera_id == null ||
          normalizarOrdenProduccion(orden_produccion) !== normalizarOrdenProduccion(movimiento.orden_cabecera))) {
@@ -1155,6 +1182,8 @@ router.delete("/movimientos/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
+    if (!(await movimientoEditable(id, res))) return;
+
     const { rowCount } = await pool.query(
       "DELETE FROM almacen_movimientos WHERE id = $1",
       [id]
